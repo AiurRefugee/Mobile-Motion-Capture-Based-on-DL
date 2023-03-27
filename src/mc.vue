@@ -38,8 +38,12 @@ var lastSelectTime = new Date().getTime()
 var nowSelect = ref(null)
 var lastColor = null
 const cubeRenderTarget = new THREE.WebGLCubeRenderTarget( 256 );
-
 const cubeCamera = new THREE.CubeCamera( 1, 1000, cubeRenderTarget );
+let guiFolder = new GUI({ autoPlace: false})
+let ratioSettings = {
+  'waist': 1,
+  'shoulder': 1
+}
 
 //props
 const props = defineProps(['type'])
@@ -227,6 +231,11 @@ const genCubeUrls = function ( prefix, postfix ) {
 
 };
 
+function addRatio() {
+  let mcratio = guiFolder.addFolder( 'MotionCapture Ratios' )
+  mcratio.add( ratioSettings, 'waist' , 0.5, 2 )
+  mcratio.add( ratioSettings, 'shoulder' , 0.5, 2 )
+}
 
 //加载背景天空盒
 function loadMap(index, url) {
@@ -479,7 +488,7 @@ function ( gltf ) {
   model.scale.set(scaleRatio, scaleRatio, scaleRatio)
   //model.position.z = 20
   scene.add( model );
-  camera.position.set(0, 10, -25)
+  camera.position.set(0, 10, 45)
   camera.lookAt(0, 14, 0)
   model.traverse( function ( object ) {
 
@@ -498,7 +507,7 @@ function ( gltf ) {
   //skeleton.bones[45].rotation.set(0.5, 0, 0)
 
 
-  const origin = new THREE.Vector3(skeleton.bones[23].position.x, skeleton.bones[23].position.y, skeleton.bones[23].position.z);
+  const origin = new THREE.Vector3(skeleton.bones[2].position.x, skeleton.bones[2].position.y, skeleton.bones[2].position.z);
   const length = 10;
   const color = 0xff0000;
   const headLength = 0.2 * length;
@@ -515,8 +524,8 @@ function ( gltf ) {
   skeleton.depthWrite = true
 
   let PI = Math.PI
-  let Euler = new THREE.Euler( Math.PI / 2, Math.PI / 3  , 0, 'XYZ' )
-  //skeleton.bones[0].setRotationFromEuler( Euler )
+  let Euler = new THREE.Euler( Math.PI / 2, 0  , 0, 'XYZ' )
+  skeleton.bones[0].setRotationFromEuler( Euler )
 
 
   // skeleton.bones.map((item, index) => {
@@ -547,16 +556,16 @@ function updateLimbBones( target, parent, skeletonIndex, right, ratio ) {
   let setX = xTemp.angleTo(parent.clone().setY(0)) * (right ? 1 : -1)
   let setY = yTemp.angleTo(nZ) * ( yTemp.y < 0 ? 1 : -1 )
   let Euler = new THREE.Euler( setX * ratio, 0, setY * ratio, 'XYZ' )
-  if(!right)
-    console.log(RToA(setX), RToA(setY))
+
   skeleton.bones[skeletonIndex].setRotationFromEuler( Euler )
 }
 
 //更新水平骨骼节点
 function updateHorizontalBones( front, up , right, parentFront, parentUp, parentRight, skeletonIndex, ratio ) {
   let angleToNZ = front.clone().setY(0).angleTo( parentFront.clone().setY(0) ) * ( front.x < 0 ? 1 : -1 )
-  let angleToY = up.clone().setZ(0).angleTo( parentUp.clone().setZ(0) ) * ( up.x > 0 ? 1 : -1 )
+  let angleToY = up.clone().setZ(0).angleTo( parentUp.clone().setZ(0) ) * ( up.x < 0 ? 1 : -1 )
   let angleToX = right.clone().setX(0).angleTo(parentRight.clone().setX(0))
+  console.log(RToA(angleToNZ), RToA(angleToY))
   skeleton.bones[skeletonIndex].rotation.set(0, angleToNZ * ratio, angleToY * ratio)
 
 }
@@ -567,35 +576,41 @@ function updateSkeleton(array) {
   //waist
   let midright = new THREE.Vector3(array[23].x - array[24].x, array[23].y - array[24].y, array[23].z - array[24].z).normalize()
   let midfront = new THREE.Vector3().crossVectors(midright, up).normalize()
-  let midupVec = new THREE.Vector3().crossVectors(midfront, midright).normalize()
-  //updateHorizontalBones( midfront, midupVec, midright, nZ, y, nX, 0 , 1)
+  let setY = midfront.clone().setY(0).angleTo(z) * ( midfront.x < 0 ? 1 : -1 )
+  //console.log(RToA(setY))
+  //skeleton.bones[0].rotation.set(Math.PI / 2,setY * ratioSettings.waist, 0)
 
-  //skeleton[2]
+  //skeleton[3]
   let right = new THREE.Vector3(array[11].x - array[12].x, array[11].y - array[12].y, array[11].z - array[12].z).normalize()
 
   let front = new THREE.Vector3().crossVectors(right, up).normalize()
   let upVec = new THREE.Vector3().crossVectors(front, right).normalize()
 
-  updateHorizontalBones( front, upVec, right, nZ, y, nX, 2 , 1)
-  updateHorizontalBones( front, upVec, right, nZ, y, nX, 1 , 0.5)
+  //updateHorizontalBones( front, upVec, right, z, y, x, 3 , ratioSettings.shoulder)
+  //updateHorizontalBones( front, upVec, right, z, y, x, 2 , ratioSettings.shoulder * 0.8)
+  //updateHorizontalBones( front, upVec, right, z, y, x, 1 , ratioSettings.shoulder * 0.4)
   //head
-  let upHead = new THREE.Vector3( (array[4].x + array[1].x) / 2 - array[0].x, (array[4].y + array[1].y) / 2 - array[0].y, (array[4].z + array[1].z) / 2 - array[0].z).normalize()
+  let upHead = new THREE.Vector3(
+  (array[4].x + array[1].x) / 2 - (array[10].x + array[9].x) / 2,
+  (array[4].y + array[1].y) / 2 - (array[10].y + array[9].y) / 2,
+  (array[4].z + array[1].z) / 2 - (array[10].z + array[9].z) / 2 ).normalize()
   let rightHead = new THREE.Vector3( array[1].x - array[4].x, array[1].y - array[4].y, array[1].z - array[4].z).normalize()
   let frontHead = new THREE.Vector3().crossVectors(rightHead, upHead).normalize()
-  let rXZ = frontHead.setY(0).angleTo(nZ) * ( frontHead.x < 0 ? 1 : -1 ) * 1 //2
-  let rYZ = upHead.setX(0).angleTo(y) * ( upHead.z < 0 ? 1 : -1) * 1 //1
-  let rXY = rightHead.setZ(0).angleTo(nX) * (right.y > 0 ? 1 : -1) * 1 //3
-  skeleton.bones[5].rotation.set( rYZ, rXZ, rXZ )
+  let rXY = rightHead.clone().setZ(0).angleTo(x) * ( rightHead.y > 0 ? 1 : -1 ) * 1  //3
+  let rXZ = frontHead.clone().setY(0).angleTo(z) * ( frontHead.x < 0 ? 1 : -1) * 1//2
+  let rYZ = upHead.clone().setX(0).angleTo(y) *    1 //3
+  console.log(RToA(rYZ))
+  skeleton.bones[5].rotation.set( rYZ - Math.PI / 4, 0, 0 )
 
   //rightForeArm
   let rightForeArm = new THREE.Vector3(array[14].x - array[12].x, array[14].y - array[12].y, array[14].z - array[12].z).normalize()
-  updateLimbBones( rightForeArm, right.clone().negate(), 24, true, 1 )
+  //updateLimbBones( rightForeArm, right.clone().negate(), 24, true, 1 )
 
 
 
   //rightArm
   let rightArm = new THREE.Vector3(array[16].x - array[14].x, array[16].y - array[14].y, array[16].z - array[14].z).normalize()
-  updateLimbBones( rightArm, rightForeArm, 25, true, 1 )
+  //updateLimbBones( rightArm, rightForeArm, 25, true, 1 )
 
   //rightHand
   let rightHand = new THREE.Vector3(array[20].x - array[16].x, array[20].y - array[16].y, array[20].z - array[26].z).normalize()
@@ -603,21 +618,23 @@ function updateSkeleton(array) {
 
   //leftForeArm
   let leftForeArm = new THREE.Vector3(array[13].x - array[11].x, array[13].y - array[11].y, array[13].z - array[11].z).normalize()
-  updateLimbBones( leftForeArm, right, 7, false, 1 )
+  //updateLimbBones( leftForeArm, right, 7, false, 1 )
 
   //leftArm
   let leftArm = new THREE.Vector3(array[15].x - array[13].x, array[15].y - array[13].y, array[15].z - array[13].z).normalize()
-  updateLimbBones( leftArm, leftForeArm, 8, false, 1 )
+  //updateLimbBones( leftArm, leftForeArm, 8, false, 1 )
 
 
-   //arrowHelperUp.setDirection(right)
-   arrowHelperFront.setDirection(frontHead)
+   arrowHelperUp.setDirection(frontHead)
+   arrowHelperFront.setDirection(upHead)
 }
 
 onMounted( async () => {
   instance = getCurrentInstance()
   loadMap(1, 'pisa')
   canvasdom.value.appendChild(renderer.domElement)
+  videoPlayer.value.appendChild(guiFolder.domElement)
+  addRatio()
   canvasdom.value.addEventListener('mousemove', (event) => {
     mouse.x = ( event.offsetX / canvasdom.value.clientWidth ) * 2 - 1;
     mouse.y = - ( event.offsetY / canvasdom.value.clientHeight ) * 2 + 1;
@@ -727,7 +744,7 @@ onMounted( async () => {
       canvasCtx.restore();
       if(results.poseWorldLandmarks) {
         updateSkeleton(results.poseWorldLandmarks.map((item) => ({
-          x: -item.x * ratio,
+          x: item.x * ratio,
           y: -item.y * ratio + bias,
           z: item.z * ratio,
           visibility: item.visibility,
@@ -901,7 +918,7 @@ watch(visible, async () => {
       </var-paper>
 
 
-    <div :class="[!fullscreen ? 'half' : 'noDisplay']" ref="video">
+    <div :class="[!fullscreen ? 'half' : 'noDisplay']" ref="videoPlayer">
       <var-paper :elevation="12" :radius="10" class="skeleton">
         <!-- <video class="input_video" width="430" height="300" autoplay src="./assets/videos/1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"
         muted="true" controls v-if="props.type == 'video' && showVideo == true" ref="videoPlayer"></video> -->
@@ -910,7 +927,7 @@ watch(visible, async () => {
         <video class="input_video" width="430" height="300"></video>
         <!-- <input type="file" ref="inputVideo" v-if="props.type == 'video'"> -->
       </var-paper>
-      <var-paper :elevation="12" :radius="10" class="skeleton">
+      <var-paper :elevation="12" :radius="10" class="skeleton" >
         <!-- <canvas class="output_canvas" :width="videoSize.width" :height="videoSize.height" :style="{'display': loading ? 'none' : 'flex'}" ></canvas> -->
         <canvas class="output_canvas" width="430" height="300" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
 
@@ -923,10 +940,6 @@ watch(visible, async () => {
 </template>
 
 <style lang="scss" scoped>
-
-
-
-
 $blueHeavy: #4747d6;
 $blueFull: #636b80d3;
 $blueLite: #3252b167;
@@ -964,6 +977,11 @@ $sidebarFontSize: 20px;
   background-color: gray;
   border-radius: 10px;
   display: none;
+}
+:deep(.root) {
+  width: 100%;
+  border-radius: 20px;
+  padding: 5%;
 }
 :deep(.var-swipe){
   overflow: hidden;
