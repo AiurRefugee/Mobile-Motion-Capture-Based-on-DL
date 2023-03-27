@@ -26,6 +26,7 @@ let x = new THREE.Vector3(1, 0, 0)
 let y = new THREE.Vector3(0, 1, 0)
 let z = new THREE.Vector3(0, 0, 1)
 let nX = new THREE.Vector3(-1, 0, 0)
+let nY = new THREE.Vector3(0, -1, 0)
 let nZ = new THREE.Vector3(0, 0, -1)
 let nullVec = new THREE.Vector3(0, 0, 0)
 const raycaster = new THREE.Raycaster()
@@ -117,7 +118,7 @@ dirLight.shadow.camera.bottom = - 200
 dirLight.shadow.camera.left = - 200
 dirLight.shadow.camera.right = 200
 dirLight.shadow.camera.near = 0.1
-dirLight.shadow.camera.far = 400
+dirLight.shadow.camera.far = 500
 dirLight.shadow.mapSize.width = 2048 // default 512
 dirLight.shadow.mapSize.height = 2048 // default
 scene.add( dirLight );
@@ -486,7 +487,7 @@ function ( gltf ) {
   model = gltf.scene;
   let scaleRatio = 9.5
   model.scale.set(scaleRatio, scaleRatio, scaleRatio)
-  //model.position.z = 20
+  model.position.x = -10
   scene.add( model );
   camera.position.set(0, 10, 45)
   camera.lookAt(0, 14, 0)
@@ -500,12 +501,6 @@ function ( gltf ) {
   skeleton = new THREE.SkeletonHelper( model );
 
   const direction = new THREE.Vector3(1, 0, 0)
-
-  //skeleton.bones[24].rotation.set(0, 0, 0.5)
-  //skeleton.bones[1].rotation.set(0, 0.5, 0)
-
-  //skeleton.bones[45].rotation.set(0.5, 0, 0)
-
 
   const origin = new THREE.Vector3(skeleton.bones[2].position.x, skeleton.bones[2].position.y, skeleton.bones[2].position.z);
   const length = 10;
@@ -527,6 +522,9 @@ function ( gltf ) {
   let Euler = new THREE.Euler( Math.PI / 2, 0  , 0, 'XYZ' )
   skeleton.bones[0].setRotationFromEuler( Euler )
 
+  let euler = new THREE.Euler( Math.PI / 3, 0, 0, 'XYZ' )
+  skeleton.bones[46].setRotationFromEuler( euler )
+  //skeleton.bones[46].rotateX(Math.PI / 3)
 
   // skeleton.bones.map((item, index) => {
   //   console.log(index, item.name)
@@ -549,6 +547,10 @@ function ( error ) {
 
 })
 
+//计算Vector
+function calculateTargetVector( target, parent ) {
+  return new THREE.Vector3( target.x - parent.x, target.y - parent.y, target.z - parent.z).normalize()
+}
 //更新肢体骨骼节点
 function updateLimbBones( target, parent, skeletonIndex, right, ratio ) {
   let xTemp = target.clone().setY(0)
@@ -565,23 +567,41 @@ function updateHorizontalBones( front, up , right, parentFront, parentUp, parent
   let angleToNZ = front.clone().setY(0).angleTo( parentFront.clone().setY(0) ) * ( front.x < 0 ? 1 : -1 )
   let angleToY = up.clone().setZ(0).angleTo( parentUp.clone().setZ(0) ) * ( up.x < 0 ? 1 : -1 )
   let angleToX = right.clone().setX(0).angleTo(parentRight.clone().setX(0))
-  console.log(RToA(angleToNZ), RToA(angleToY))
+  //console.log(RToA(angleToNZ), RToA(angleToY))
   skeleton.bones[skeletonIndex].rotation.set(0, angleToNZ * ratio, angleToY * ratio)
 
+}
+
+//更新大腿
+function updateUpLeg( target, parentX, parentZ, skeletonIndex, right, ratio) {
+  skeleton.bones[skeletonIndex].rotation.set( Math.PI, 0, 0 )
+  let setX = target.clone().setX(0).angleTo(parentX) * ( target.z > 0 ? 1 : -1 )
+  let setZ = target.clone().setZ(0).angleTo(parentZ) * ( target.x < 0 ? 1 : -1 )
+  skeleton.bones[skeletonIndex].rotateX(setX)
+  skeleton.bones[skeletonIndex].rotateZ(setZ)
+  console.log(RToA(setZ))
+}
+
+//更新小腿
+function updateLeg( target, parentX, parentZ, skeletonIndex, right, ratio) {
+  let setX = target.clone().setX(0).angleTo(parentX) * ( target.z > 0 ? 1 : -1 )
+  let setZ = target.clone().setZ(0).angleTo(parentZ) * ( target.x < 0 ? 1 : -1 )
+  skeleton.bones[skeletonIndex].rotation.set(setX, 0, setZ)
+  console.log(RToA(setZ))
 }
 
 function updateSkeleton(array) {
   let up = new THREE.Vector3(0, 1, 0)
 
   //waist
-  let midright = new THREE.Vector3(array[23].x - array[24].x, array[23].y - array[24].y, array[23].z - array[24].z).normalize()
+  let midright = calculateTargetVector(array[23], array[24])
   let midfront = new THREE.Vector3().crossVectors(midright, up).normalize()
   let setY = midfront.clone().setY(0).angleTo(z) * ( midfront.x < 0 ? 1 : -1 )
   //console.log(RToA(setY))
-  //skeleton.bones[0].rotation.set(Math.PI / 2,setY * ratioSettings.waist, 0)
+  skeleton.bones[0].rotation.set(Math.PI / 2,setY * ratioSettings.waist, 0)
 
   //skeleton[3]
-  let right = new THREE.Vector3(array[11].x - array[12].x, array[11].y - array[12].y, array[11].z - array[12].z).normalize()
+  let right = calculateTargetVector(array[11], array[12])
 
   let front = new THREE.Vector3().crossVectors(right, up).normalize()
   let upVec = new THREE.Vector3().crossVectors(front, right).normalize()
@@ -594,39 +614,52 @@ function updateSkeleton(array) {
   (array[4].x + array[1].x) / 2 - (array[10].x + array[9].x) / 2,
   (array[4].y + array[1].y) / 2 - (array[10].y + array[9].y) / 2,
   (array[4].z + array[1].z) / 2 - (array[10].z + array[9].z) / 2 ).normalize()
-  let rightHead = new THREE.Vector3( array[1].x - array[4].x, array[1].y - array[4].y, array[1].z - array[4].z).normalize()
+  let rightHead = calculateTargetVector(array[1], array[4])
   let frontHead = new THREE.Vector3().crossVectors(rightHead, upHead).normalize()
   let rXY = rightHead.clone().setZ(0).angleTo(x) * ( rightHead.y > 0 ? 1 : -1 ) * 1  //3
   let rXZ = frontHead.clone().setY(0).angleTo(z) * ( frontHead.x < 0 ? 1 : -1) * 1//2
-  let rYZ = upHead.clone().setX(0).angleTo(y) *    1 //3
-  console.log(RToA(rYZ))
-  skeleton.bones[5].rotation.set( rYZ - Math.PI / 4, 0, 0 )
+  let rYZ = upHead.clone().setX(0).angleTo(y) *    1 //1
+  //console.log(RToA(rYZ))
+  skeleton.bones[5].rotation.set( rYZ - Math.PI / 4, rXZ, rXY )
 
   //rightForeArm
-  let rightForeArm = new THREE.Vector3(array[14].x - array[12].x, array[14].y - array[12].y, array[14].z - array[12].z).normalize()
-  //updateLimbBones( rightForeArm, right.clone().negate(), 24, true, 1 )
-
-
+  let rightForeArm = calculateTargetVector(array[14], array[12])
+  updateLimbBones( rightForeArm, right.clone().negate(), 24, true, 1 )
 
   //rightArm
-  let rightArm = new THREE.Vector3(array[16].x - array[14].x, array[16].y - array[14].y, array[16].z - array[14].z).normalize()
-  //updateLimbBones( rightArm, rightForeArm, 25, true, 1 )
+  let rightArm = calculateTargetVector(array[16], array[14])
+  updateLimbBones( rightArm, rightForeArm, 25, true, 1 )
 
   //rightHand
-  let rightHand = new THREE.Vector3(array[20].x - array[16].x, array[20].y - array[16].y, array[20].z - array[26].z).normalize()
+  let rightHand = calculateTargetVector(array[20], array[16])
   //updateLimbBones( rightHand, rightArm, 26, true, 1 )
 
+  //rightUpLeg
+  let rightUpLeg = calculateTargetVector(array[26], array[24])
+  updateUpLeg( rightUpLeg, nY, nY, 45, true, true, 1)
+
+  //rightLeg
+  let rightLeg = calculateTargetVector(array[28], array[26])
+  updateLeg( rightLeg, rightUpLeg.setX(0), rightUpLeg.setZ(0).setZ(0), 46, true, 1)
+
   //leftForeArm
-  let leftForeArm = new THREE.Vector3(array[13].x - array[11].x, array[13].y - array[11].y, array[13].z - array[11].z).normalize()
-  //updateLimbBones( leftForeArm, right, 7, false, 1 )
+  let leftForeArm = calculateTargetVector(array[13], array[11])
+  updateLimbBones( leftForeArm, right, 7, false, 1 )
 
   //leftArm
-  let leftArm = new THREE.Vector3(array[15].x - array[13].x, array[15].y - array[13].y, array[15].z - array[13].z).normalize()
-  //updateLimbBones( leftArm, leftForeArm, 8, false, 1 )
+  let leftArm = calculateTargetVector(array[15], array[13])
+  updateLimbBones( leftArm, leftForeArm, 8, false, 1 )
 
+  //leftUpLeg
+  let leftUpLeg = calculateTargetVector(array[25], array[23])
+  updateUpLeg( leftUpLeg, nY, nY, 41, true, 1)
 
-   arrowHelperUp.setDirection(frontHead)
-   arrowHelperFront.setDirection(upHead)
+  //leftLeg
+  let leftLeg = calculateTargetVector(array[27], array[25])
+  updateLeg( leftLeg, leftUpLeg.setX(0), leftUpLeg.setZ(0).setZ(0), 42, true, 1)
+
+   arrowHelperUp.setDirection(rightLeg)
+   arrowHelperFront.setDirection(midright)
 }
 
 onMounted( async () => {
@@ -642,163 +675,96 @@ onMounted( async () => {
   });
 
   updateThree();
+  const videoElement = document.getElementsByClassName('input_video')[0];
+  const canvasElement = document.getElementsByClassName('output_canvas')[0];
+  const canvasCtx = canvasElement.getContext('2d');
 
 
-  // Load a glTF resource
+  function onResults(results) {
+    loading.value = false
+    canvasCtx.save();
+    let ratio = 12
+    let bias = 8.5
+    if( results.poseWorldLandmarks ) {
+      let array = keypoint.map( (value, index) => {
+        value.position.set( -results.poseWorldLandmarks[index].x * ratio, -results.poseWorldLandmarks[index].y * ratio + bias, results.poseWorldLandmarks[index].z * ratio)
+      })
 
-    // function onResults(results) {
-    //   loading.value = false
-    //   keypoint.map( (item, index) => {
-    //     console.log(results.za[index].x * 800, results.za[index].y * 600, results.za[index].z)
-    //     item.position.set(results.za[index].x * 800, results.za[index].y * 600, results.za[index].z)
-    //   })
-    //   canvasCtx.save();
-    //   canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-    //   try{
-    //     canvasCtx.drawImage(
-    //       results.image, 0, 0, canvasElement.width, canvasElement.height);
-
-    //     canvasCtx.globalCompositeOperation = 'source-over';
-    //     drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
-    //                   {color: '#00FF00', lineWidth: 4});
-    //     drawLandmarks(canvasCtx, results.poseLandmarks,
-    //                   {color: '#FF0000', lineWidth: 2});
-    //     drawConnectors(canvasCtx, results.faceLandmarks, FACEMESH_TESSELATION,
-    //                   {color: '#C0C0C070', lineWidth: 1});
-    //     drawConnectors(canvasCtx, results.leftHandLandmarks, HAND_CONNECTIONS,
-    //                   {color: '#CC0000', lineWidth: 5});
-    //     drawLandmarks(canvasCtx, results.leftHandLandmarks,
-    //                   {color: '#00FF00', lineWidth: 2});
-    //     drawConnectors(canvasCtx, results.rightHandLandmarks, HAND_CONNECTIONS,
-    //                   {color: '#00CC00', lineWidth: 5});
-    //     drawLandmarks(canvasCtx, results.rightHandLandmarks,
-    //                   {color: '#FF0000', lineWidth: 2});
-    //   } catch(e) {
-    //     console.log(e)
-    //   }
-    // }
-    // const videoElement = document.getElementsByClassName('input_video')[0];
-    // const canvasElement = document.getElementsByClassName('output_canvas')[0];
-    // const canvasCtx = canvasElement.getContext('2d');
-    // const pose = new Pose({locateFile: (file) => {
-    //   return `@mediapipe/pose/${file}`;
-    // }});
-    // pose.setOptions({
-    //   modelComplexity: 0,
-    //   smoothLandmarks: true,
-    //   enableSegmentation: true,
-    //   smoothSegmentation: true,
-    //   refineFaceLandmarks: true,
-    //   minDetectionConfidence: 0.5,
-    //   minTrackingConfidence: 0.5
-    // });
-
-    // pose.onResults(onResults);
-    // const camera = new Camera(videoElement, {
-    //   onFrame: async () => {
-    //     await pose.send({image: videoElement});
-    //   },
-    //   width: 860,
-    //   height: 600
-    // });
-    //camera.start();
-    const videoElement = document.getElementsByClassName('input_video')[0];
-    const canvasElement = document.getElementsByClassName('output_canvas')[0];
-    const canvasCtx = canvasElement.getContext('2d');
-
-
-    function onResults(results) {
-      loading.value = false
-      canvasCtx.save();
-      let ratio = 12
-      let bias = 8.5
-      if( results.poseWorldLandmarks ) {
-        // let array = keypoint.map( (value, index) => {
-        //   value.position.set( -results.poseWorldLandmarks[index].x * ratio, -results.poseWorldLandmarks[index].y * ratio + bias, results.poseWorldLandmarks[index].z * ratio)
-        // })
-
-        // skeleton.bones[7].position.set(-results.poseWorldLandmarks[11].x * ratio, -results.poseWorldLandmarks[11].y * ratio + bias, results.poseWorldLandmarks[11].z * ratio)
-        // skeleton.bones[8].position.set(-results.poseWorldLandmarks[13].x * ratio, -results.poseWorldLandmarks[13].y * ratio + bias, results.poseWorldLandmarks[13].z * ratio)
-        // skeleton.bones[9].position.set(-results.poseWorldLandmarks[15].x * ratio, -results.poseWorldLandmarks[15].y * ratio + bias, results.poseWorldLandmarks[15].z * ratio)
-        // skeleton.bones[24].position.set(-results.poseWorldLandmarks[12].x * ratio, -results.poseWorldLandmarks[12].y * ratio + bias, results.poseWorldLandmarks[12].z * ratio)
-        // skeleton.bones[25].position.set(-results.poseWorldLandmarks[14].x * ratio, -results.poseWorldLandmarks[14].y * ratio + bias, results.poseWorldLandmarks[14].z * ratio)
-        // skeleton.bones[26].position.set(-results.poseWorldLandmarks[16].x * ratio, -results.poseWorldLandmarks[16].y * ratio + bias, results.poseWorldLandmarks[16].z * ratio)
-
-      }
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      // Only overwrite existing pixels.
-      canvasCtx.globalCompositeOperation = 'source-in';
-      canvasCtx.fillStyle = '#00FF00';
-      canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
-
-      // Only overwrite missing pixels.
-      canvasCtx.globalCompositeOperation = 'destination-atop';
-      canvasCtx.drawImage(
-          results.image, 0, 0, canvasElement.width, canvasElement.height);
-
-      canvasCtx.globalCompositeOperation = 'source-over';
-      drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
-                    {color: '#00FF00', lineWidth: 4});
-      drawLandmarks(canvasCtx, results.poseLandmarks,
-                    {color: '#FF0000', lineWidth: 2});
-      canvasCtx.restore();
-      if(results.poseWorldLandmarks) {
-        updateSkeleton(results.poseWorldLandmarks.map((item) => ({
-          x: item.x * ratio,
-          y: -item.y * ratio + bias,
-          z: item.z * ratio,
-          visibility: item.visibility,
-        })))
-      }
     }
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    // Only overwrite existing pixels.
+    canvasCtx.globalCompositeOperation = 'source-in';
+    canvasCtx.fillStyle = '#00FF00';
+    canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
 
-    const pose = new Pose({locateFile: (file) => {
-      return `@mediapipe/pose/${file}`;
-    }});
-    pose.setOptions({
-      modelComplexity: 1,
-      smoothLandmarks: true,
-      enableSegmentation: false,
-      smoothSegmentation: false,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.6
-    });
-    pose.onResults(onResults);
-    // if( props.type == 'video') {
+    // Only overwrite missing pixels.
+    canvasCtx.globalCompositeOperation = 'destination-atop';
+    canvasCtx.drawImage(
+        results.image, 0, 0, canvasElement.width, canvasElement.height);
 
-    //   const fileInput = inputVideo.value
-    //   await nextTick()
+    canvasCtx.globalCompositeOperation = 'source-over';
+    drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS,
+                  {color: '#00FF00', lineWidth: 4});
+    drawLandmarks(canvasCtx, results.poseLandmarks,
+                  {color: '#FF0000', lineWidth: 2});
+    canvasCtx.restore();
+    if(results.poseWorldLandmarks && settings.value.mcEnabled) {
+      updateSkeleton(results.poseWorldLandmarks.map((item) => ({
+        x: item.x * ratio,
+        y: -item.y * ratio + bias,
+        z: item.z * ratio,
+        visibility: item.visibility,
+      })))
+    }
+  }
 
-    //   fileInput.addEventListener( "change", () => {
-    //     const file = fileInput.files[0]
-    //     const reader = new FileReader()
-    //     reader.addEventListener( "load", async () => {
-    //       showVideo.value = !showVideo.value
-    //       await nextTick()
-    //       const videoElement = document.getElementsByClassName('input_video')[0];
-    //       videoPlayer.value.src = reader.result
-    //       videoElement.addEventListener("timeupdate", async () => {
-    //         await pose.send({image: videoElement});
-    //       })
-    //     })
-    //     reader.readAsDataURL(file)
-    //   })
+  const pose = new Pose({locateFile: (file) => {
+    return `@mediapipe/pose/${file}`;
+  }});
+  pose.setOptions({
+    modelComplexity: 1,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    smoothSegmentation: false,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
+  });
+  pose.onResults(onResults);
+  // if( props.type == 'video') {
+
+  //   const fileInput = inputVideo.value
+  //   await nextTick()
+
+  //   fileInput.addEventListener( "change", () => {
+  //     const file = fileInput.files[0]
+  //     const reader = new FileReader()
+  //     reader.addEventListener( "load", async () => {
+  //       showVideo.value = !showVideo.value
+  //       await nextTick()
+  //       const videoElement = document.getElementsByClassName('input_video')[0];
+  //       videoPlayer.value.src = reader.result
+  //       videoElement.addEventListener("timeupdate", async () => {
+  //         await pose.send({image: videoElement});
+  //       })
+  //     })
+  //     reader.readAsDataURL(file)
+  //   })
 
 
-    // }
+  // }
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await pose.send({image: videoElement});
-      },
-      width: 430,
-      height: 300
-    });
-    camera.start();
+  const camera = new Camera(videoElement, {
+    onFrame: async () => {
+      await pose.send({image: videoElement});
+    },
+    width: 500,
+    height: 500
+  });
+  camera.start();
 
-    // videoElement.addEventListener("timeupdate", async () => {
-    //   await pose.send({image: videoElement});
-    // })
+  // videoElement.addEventListener("timeupdate", async () => {
+  //   await pose.send({image: videoElement});
+  // })
 })
 
 const render = async () => {
@@ -924,12 +890,12 @@ watch(visible, async () => {
         muted="true" controls v-if="props.type == 'video' && showVideo == true" ref="videoPlayer"></video> -->
         <!-- <video class="input_video" width="430" height="300" autoplay src="./assets/videos/1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"
         muted="true" controls ref="videoPlayer"></video> -->
-        <video class="input_video" width="430" height="300"></video>
+        <video class="input_video" width="500" height="500"></video>
         <!-- <input type="file" ref="inputVideo" v-if="props.type == 'video'"> -->
       </var-paper>
       <var-paper :elevation="12" :radius="10" class="skeleton" >
         <!-- <canvas class="output_canvas" :width="videoSize.width" :height="videoSize.height" :style="{'display': loading ? 'none' : 'flex'}" ></canvas> -->
-        <canvas class="output_canvas" width="430" height="300" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
+        <canvas class="output_canvas" width="500" height="500" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
 
         <var-loading v-show="loading" type="wave" size="large"/>
 
@@ -980,7 +946,7 @@ $sidebarFontSize: 20px;
 }
 :deep(.root) {
   width: 100%;
-  border-radius: 20px;
+  border-radius: 15px;
   padding: 5%;
 }
 :deep(.var-swipe){
@@ -999,9 +965,9 @@ $sidebarFontSize: 20px;
   width: 100%;
   height: 100%;
 }
-:deep(.var-swipe__indicators){
-  bottom: 0;
-}
+// :deep(.var-swipe__indicators){
+//   bottom: 0;
+// }
 .mcContainer{
   display: flex;
   width: 100vw;
@@ -1113,8 +1079,8 @@ $sidebarFontSize: 20px;
         @include center();
         flex-direction: column;
         flex-shrink: 0;
-        width: 430px;
-        height: 300px;
+        width: 500px;
+        height: 500px;
       }
     }
 
