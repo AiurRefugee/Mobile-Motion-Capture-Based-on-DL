@@ -4,20 +4,24 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import { onMounted, ref, watch, nextTick, getCurrentInstance } from 'vue'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { StyleProvider, Themes, Snackbar } from '@varlet/ui'
 import { TransformControls } from 'three-transform-controls/TransformControls.js';
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
-import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
-import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
-import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js';
+// import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
+// import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
+// import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js';
 const loader = new GLTFLoader();
 // Optional: Provide a DRACOLoader instance to decode compressed mesh data
 const dracoLoader = new DRACOLoader();
+const gltfExporter = new GLTFExporter();
 dracoLoader.setDecoderPath( 'three/examples/js/libs/draco/gltf' );
 loader.setDRACOLoader( dracoLoader );
 const cubeMapLoader = new THREE.CubeTextureLoader()
 let model, INTERSECTED
 let keypoint = []
+const link = document.createElement( 'a' );
+link.style.display = 'none';
 let arrowHelperFront
 let arrowHelperUp
 let arrowHelperRight
@@ -42,8 +46,14 @@ const cubeRenderTarget = new THREE.WebGLCubeRenderTarget( 256 );
 const cubeCamera = new THREE.CubeCamera( 1, 1000, cubeRenderTarget );
 let guiFolder = new GUI({ autoPlace: false})
 let ratioSettings = {
+  'threshold': 0.8,
+  'head': 1,
+  'shoulder': 1,
+  'foreArm': 1,
+  'arm': 1,
   'waist': 1,
-  'shoulder': 1
+  'upLeg': 1,
+  'leg': 1
 }
 
 //props
@@ -234,8 +244,15 @@ const genCubeUrls = function ( prefix, postfix ) {
 
 function addRatio() {
   let mcratio = guiFolder.addFolder( 'MotionCapture Ratios' )
-  mcratio.add( ratioSettings, 'waist' , 0.5, 2 )
+  mcratio.add( ratioSettings, 'head' , 0.5, 2 )
   mcratio.add( ratioSettings, 'shoulder' , 0.5, 2 )
+  mcratio.add( ratioSettings, 'foreArm' , 0.5, 2 )
+  mcratio.add( ratioSettings, 'arm' , 0.5, 2 )
+  mcratio.add( ratioSettings, 'waist' , 0.5, 2 )
+  mcratio.add( ratioSettings, 'upLeg' , 0.5, 2 )
+  mcratio.add( ratioSettings, 'leg' , 0.5, 2 )
+  let threshold = guiFolder.addFolder( 'MotionCapture Threshold' )
+  threshold.add( ratioSettings, 'threshold', 0.5, 0.95 )
 }
 
 //加载背景天空盒
@@ -279,10 +296,55 @@ function setmode(mode) {
 }
 
 transformControls.addEventListener( 'dragging-changed', function ( event ) {
-
   controls.enabled = ! event.value;
-
 } );
+
+//导出
+
+function saveString( text, filename ) {
+  save( new Blob( [ text ], { type: 'text/plain' } ), filename );
+}
+
+
+function saveArrayBuffer( buffer, filename ) {
+  save( new Blob( [ buffer ], { type: 'application/octet-stream' } ), filename );
+}
+
+function save( blob, filename ) {
+
+  link.href = URL.createObjectURL( blob );
+  link.download = filename;
+  link.click();
+
+  // URL.revokeObjectURL( url ); breaks Firefox...
+
+}
+
+function exportScene() {
+  gltfExporter.parse(
+    scene,
+    function ( result ) {
+
+      if ( result instanceof ArrayBuffer ) {
+
+        saveArrayBuffer( result, 'scene.glb' );
+
+      } else {
+
+        const output = JSON.stringify( result, null, 2 );
+        //console.log( output );
+        saveString( output, 'scene.gltf' );
+
+      }
+
+    },
+    function ( error ) {
+
+      console.log( 'An error happened during parsing', error );
+
+    }
+  )
+}
 
 //截图
 function screenshot() {
@@ -516,20 +578,12 @@ function ( gltf ) {
   scene.add(arrowHelperUp)
   scene.add(arrowHelperRight)
 
-  skeleton.depthWrite = true
 
   let PI = Math.PI
   let Euler = new THREE.Euler( Math.PI / 2, 0  , 0, 'XYZ' )
   skeleton.bones[0].setRotationFromEuler( Euler )
 
-  let euler = new THREE.Euler( Math.PI / 3, 0, 0, 'XYZ' )
-  skeleton.bones[46].setRotationFromEuler( euler )
-  //skeleton.bones[46].rotateX(Math.PI / 3)
-
-  // skeleton.bones.map((item, index) => {
-  //   console.log(index, item.name)
-  // })
-  skeleton.visible = true;
+  skeleton.visible = true
   scene.add( skeleton );
   render()
 
@@ -567,7 +621,6 @@ function updateHorizontalBones( front, up , right, parentFront, parentUp, parent
   let angleToNZ = front.clone().setY(0).angleTo( parentFront.clone().setY(0) ) * ( front.x < 0 ? 1 : -1 )
   let angleToY = up.clone().setZ(0).angleTo( parentUp.clone().setZ(0) ) * ( up.x < 0 ? 1 : -1 )
   let angleToX = right.clone().setX(0).angleTo(parentRight.clone().setX(0))
-  //console.log(RToA(angleToNZ), RToA(angleToY))
   skeleton.bones[skeletonIndex].rotation.set(0, angleToNZ * ratio, angleToY * ratio)
 
 }
@@ -577,17 +630,15 @@ function updateUpLeg( target, parentX, parentZ, skeletonIndex, right, ratio) {
   skeleton.bones[skeletonIndex].rotation.set( Math.PI, 0, 0 )
   let setX = target.clone().setX(0).angleTo(parentX) * ( target.z > 0 ? 1 : -1 )
   let setZ = target.clone().setZ(0).angleTo(parentZ) * ( target.x < 0 ? 1 : -1 )
-  skeleton.bones[skeletonIndex].rotateX(setX)
-  skeleton.bones[skeletonIndex].rotateZ(setZ)
-  console.log(RToA(setZ))
+  skeleton.bones[skeletonIndex].rotateX(setX * ratio)
+  skeleton.bones[skeletonIndex].rotateZ(setZ * ratio)
 }
 
 //更新小腿
 function updateLeg( target, parentX, parentZ, skeletonIndex, right, ratio) {
   let setX = target.clone().setX(0).angleTo(parentX) * ( target.z > 0 ? 1 : -1 )
   let setZ = target.clone().setZ(0).angleTo(parentZ) * ( target.x < 0 ? 1 : -1 )
-  skeleton.bones[skeletonIndex].rotation.set(setX, 0, setZ)
-  console.log(RToA(setZ))
+  skeleton.bones[skeletonIndex].rotation.set( setX * ratio, 0, setZ * ratio )
 }
 
 function updateSkeleton(array) {
@@ -597,18 +648,20 @@ function updateSkeleton(array) {
   let midright = calculateTargetVector(array[23], array[24])
   let midfront = new THREE.Vector3().crossVectors(midright, up).normalize()
   let setY = midfront.clone().setY(0).angleTo(z) * ( midfront.x < 0 ? 1 : -1 )
-  //console.log(RToA(setY))
-  skeleton.bones[0].rotation.set(Math.PI / 2,setY * ratioSettings.waist, 0)
+  if (array[23].visibility > ratioSettings.threshold && array[23].visibility > ratioSettings.threshold){
+    skeleton.bones[0].rotation.set(Math.PI / 2,setY * ratioSettings.waist, 0)
+  }
 
   //skeleton[3]
   let right = calculateTargetVector(array[11], array[12])
-
   let front = new THREE.Vector3().crossVectors(right, up).normalize()
   let upVec = new THREE.Vector3().crossVectors(front, right).normalize()
+  if (array[11].visibility > ratioSettings.threshold && array[12].visibility > ratioSettings.threshold){
+    updateHorizontalBones( front, upVec, right, z, y, x, 3 , ratioSettings.shoulder)
+    updateHorizontalBones( front, upVec, right, z, y, x, 2 , ratioSettings.shoulder * 0.8)
+    updateHorizontalBones( front, upVec, right, z, y, x, 1 , ratioSettings.shoulder * 0.4)
+  }
 
-  //updateHorizontalBones( front, upVec, right, z, y, x, 3 , ratioSettings.shoulder)
-  //updateHorizontalBones( front, upVec, right, z, y, x, 2 , ratioSettings.shoulder * 0.8)
-  //updateHorizontalBones( front, upVec, right, z, y, x, 1 , ratioSettings.shoulder * 0.4)
   //head
   let upHead = new THREE.Vector3(
   (array[4].x + array[1].x) / 2 - (array[10].x + array[9].x) / 2,
@@ -619,16 +672,23 @@ function updateSkeleton(array) {
   let rXY = rightHead.clone().setZ(0).angleTo(x) * ( rightHead.y > 0 ? 1 : -1 ) * 1  //3
   let rXZ = frontHead.clone().setY(0).angleTo(z) * ( frontHead.x < 0 ? 1 : -1) * 1//2
   let rYZ = upHead.clone().setX(0).angleTo(y) *    1 //1
-  //console.log(RToA(rYZ))
-  skeleton.bones[5].rotation.set( rYZ - Math.PI / 4, rXZ, rXY )
+  if (array[4].visibility > ratioSettings.threshold && array[10].visibility > ratioSettings.threshold){
+    skeleton.bones[5].rotation.set( rYZ * ratioSettings.head - Math.PI / 4, rXZ * ratioSettings.head, rXY * ratioSettings.head )
+  }
+
 
   //rightForeArm
   let rightForeArm = calculateTargetVector(array[14], array[12])
-  updateLimbBones( rightForeArm, right.clone().negate(), 24, true, 1 )
+  if (array[14].visibility > ratioSettings.threshold && array[12].visibility > ratioSettings.threshold){
+    updateLimbBones( rightForeArm, right.clone().negate(), 24, true, ratioSettings.foreArm )
+  }
+
 
   //rightArm
   let rightArm = calculateTargetVector(array[16], array[14])
-  updateLimbBones( rightArm, rightForeArm, 25, true, 1 )
+  if (array[16].visibility > ratioSettings.threshold && array[14].visibility > ratioSettings.threshold){
+    updateLimbBones( rightArm, rightForeArm, 25, true, ratioSettings.arm )
+  }
 
   //rightHand
   let rightHand = calculateTargetVector(array[20], array[16])
@@ -636,30 +696,43 @@ function updateSkeleton(array) {
 
   //rightUpLeg
   let rightUpLeg = calculateTargetVector(array[26], array[24])
-  updateUpLeg( rightUpLeg, nY, nY, 45, true, true, 1)
+  if (array[26].visibility > ratioSettings.threshold && array[24].visibility > ratioSettings.threshold){
+    updateUpLeg( rightUpLeg, nY, nY, 45, true, true, ratioSettings.upLeg )
+  }
 
   //rightLeg
   let rightLeg = calculateTargetVector(array[28], array[26])
-  updateLeg( rightLeg, rightUpLeg.setX(0), rightUpLeg.setZ(0).setZ(0), 46, true, 1)
+  if (array[26].visibility > ratioSettings.threshold && array[28].visibility > ratioSettings.threshold){
+    updateLeg( rightLeg, rightUpLeg.setX(0), rightUpLeg.setZ(0).setZ(0), 46, true, ratioSettings.leg )
+  }
+
 
   //leftForeArm
   let leftForeArm = calculateTargetVector(array[13], array[11])
-  updateLimbBones( leftForeArm, right, 7, false, 1 )
+  if (array[26].visibility > ratioSettings.threshold && array[24].visibility > ratioSettings.threshold){
+    updateLimbBones( leftForeArm, right, 7, false, ratioSettings.foreArm )
+  }
 
   //leftArm
   let leftArm = calculateTargetVector(array[15], array[13])
-  updateLimbBones( leftArm, leftForeArm, 8, false, 1 )
+  if (array[15].visibility > ratioSettings.threshold && array[13].visibility > ratioSettings.threshold){
+    updateLimbBones( leftArm, leftForeArm, 8, false, ratioSettings.arm )
+  }
 
   //leftUpLeg
   let leftUpLeg = calculateTargetVector(array[25], array[23])
-  updateUpLeg( leftUpLeg, nY, nY, 41, true, 1)
+  if (array[25].visibility > ratioSettings.threshold && array[23].visibility > ratioSettings.threshold){
+    updateUpLeg( leftUpLeg, nY, nY, 41, true, ratioSettings.upLeg)
+  }
 
   //leftLeg
   let leftLeg = calculateTargetVector(array[27], array[25])
-  updateLeg( leftLeg, leftUpLeg.setX(0), leftUpLeg.setZ(0).setZ(0), 42, true, 1)
+  if (array[27].visibility > ratioSettings.threshold && array[25].visibility > ratioSettings.threshold){
+    updateLeg( leftLeg, leftUpLeg.setX(0), leftUpLeg.setZ(0).setZ(0), 42, true, ratioSettings.leg )
+  }
 
-   arrowHelperUp.setDirection(rightLeg)
-   arrowHelperFront.setDirection(midright)
+  //  arrowHelperUp.setDirection(rightLeg)
+  //  arrowHelperFront.setDirection(midright)
 }
 
 onMounted( async () => {
@@ -668,6 +741,7 @@ onMounted( async () => {
   canvasdom.value.appendChild(renderer.domElement)
   videoPlayer.value.appendChild(guiFolder.domElement)
   addRatio()
+
   canvasdom.value.addEventListener('mousemove', (event) => {
     mouse.x = ( event.offsetX / canvasdom.value.clientWidth ) * 2 - 1;
     mouse.y = - ( event.offsetY / canvasdom.value.clientHeight ) * 2 + 1;
@@ -758,7 +832,7 @@ onMounted( async () => {
       await pose.send({image: videoElement});
     },
     width: 500,
-    height: 500
+    height: 450
   });
   camera.start();
 
@@ -815,17 +889,13 @@ watch(visible, async () => {
         <text>删除</text>
         <var-icon name="trash-can-outline" :size="sidebarIconSize"/>
     </var-cell>
-    <var-cell border ripple class="menuItem">
+    <var-cell border ripple class="menuItem" @click="exportScene">
         <text>导出</text>
         <var-icon name="upload" :size="sidebarIconSize"/>
     </var-cell>
     <var-cell border ripple class="menuItem" @click="fullscreen = !fullscreen">
         <text>全屏</text>
         <var-switch v-model="fullscreen" :size="sidebarIconSize/2" @click.stop/>
-    </var-cell>
-    <var-cell border ripple class="menuItem" @click="settings.showDat = !settings.showDat">
-      <text>设置</text>
-      <var-switch v-model="settings.showDat" :size="sidebarIconSize/2" @click.stop/>
     </var-cell>
     <var-cell border ripple class="menuItem" @click="settings.mcEnabled = !settings.mcEnabled">
       <text>动捕</text>
@@ -890,12 +960,12 @@ watch(visible, async () => {
         muted="true" controls v-if="props.type == 'video' && showVideo == true" ref="videoPlayer"></video> -->
         <!-- <video class="input_video" width="430" height="300" autoplay src="./assets/videos/1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"
         muted="true" controls ref="videoPlayer"></video> -->
-        <video class="input_video" width="500" height="500"></video>
+        <video class="input_video" width="500" height="450"></video>
         <!-- <input type="file" ref="inputVideo" v-if="props.type == 'video'"> -->
       </var-paper>
       <var-paper :elevation="12" :radius="10" class="skeleton" >
         <!-- <canvas class="output_canvas" :width="videoSize.width" :height="videoSize.height" :style="{'display': loading ? 'none' : 'flex'}" ></canvas> -->
-        <canvas class="output_canvas" width="500" height="500" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
+        <canvas class="output_canvas" width="500" height="450" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
 
         <var-loading v-show="loading" type="wave" size="large"/>
 
@@ -1080,7 +1150,7 @@ $sidebarFontSize: 20px;
         flex-direction: column;
         flex-shrink: 0;
         width: 500px;
-        height: 500px;
+        height: 450px;
       }
     }
 
