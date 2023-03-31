@@ -47,6 +47,7 @@ const cubeCamera = new THREE.CubeCamera( 1, 1000, cubeRenderTarget );
 let guiFolder = new GUI({ autoPlace: false})
 let ratioSettings = {
   'threshold': 0.8,
+  'cameraRotationFixRatio': 0.5,
   'head': 1,
   'shoulder': 1,
   'foreArm': 1,
@@ -253,6 +254,7 @@ function addRatio() {
   mcratio.add( ratioSettings, 'leg' , 0.5, 2 )
   let threshold = guiFolder.addFolder( 'MotionCapture Threshold' )
   threshold.add( ratioSettings, 'threshold', 0.5, 0.95 )
+  threshold.add( ratioSettings, 'cameraRotationFixRatio', 0.2, 1 )
 }
 
 //加载背景天空盒
@@ -672,21 +674,21 @@ function updateSkeleton(array) {
   let rXY = rightHead.clone().setZ(0).angleTo(x) * ( rightHead.y > 0 ? 1 : -1 ) * 1  //3
   let rXZ = frontHead.clone().setY(0).angleTo(z) * ( frontHead.x < 0 ? 1 : -1) * 1//2
   let rYZ = upHead.clone().setX(0).angleTo(y) *    1 //1
-  if (array[4].visibility > ratioSettings.threshold && array[10].visibility > ratioSettings.threshold){
+  if (array[4].visibility > ratioSettings.threshold || array[10].visibility > ratioSettings.threshold){
     skeleton.bones[5].rotation.set( rYZ * ratioSettings.head - Math.PI / 4, rXZ * ratioSettings.head, rXY * ratioSettings.head )
   }
 
 
   //rightForeArm
   let rightForeArm = calculateTargetVector(array[14], array[12])
-  if (array[14].visibility > ratioSettings.threshold && array[12].visibility > ratioSettings.threshold){
+  if (array[14].visibility > ratioSettings.threshold || array[12].visibility > ratioSettings.threshold){
     updateLimbBones( rightForeArm, right.clone().negate(), 24, true, ratioSettings.foreArm )
   }
 
 
   //rightArm
   let rightArm = calculateTargetVector(array[16], array[14])
-  if (array[16].visibility > ratioSettings.threshold && array[14].visibility > ratioSettings.threshold){
+  if (array[16].visibility > ratioSettings.threshold || array[14].visibility > ratioSettings.threshold){
     updateLimbBones( rightArm, rightForeArm, 25, true, ratioSettings.arm )
   }
 
@@ -696,46 +698,47 @@ function updateSkeleton(array) {
 
   //rightUpLeg
   let rightUpLeg = calculateTargetVector(array[26], array[24])
-  if (array[26].visibility > ratioSettings.threshold && array[24].visibility > ratioSettings.threshold){
+  if (array[26].visibility > ratioSettings.threshold || array[24].visibility > ratioSettings.threshold){
     updateUpLeg( rightUpLeg, nY, nY, 45, true, true, ratioSettings.upLeg )
   }
 
   //rightLeg
   let rightLeg = calculateTargetVector(array[28], array[26])
-  if (array[26].visibility > ratioSettings.threshold && array[28].visibility > ratioSettings.threshold){
+  if (array[26].visibility > ratioSettings.threshold || array[28].visibility > ratioSettings.threshold){
     updateLeg( rightLeg, rightUpLeg.setX(0), rightUpLeg.setZ(0).setZ(0), 46, true, ratioSettings.leg )
   }
 
 
   //leftForeArm
   let leftForeArm = calculateTargetVector(array[13], array[11])
-  if (array[26].visibility > ratioSettings.threshold && array[24].visibility > ratioSettings.threshold){
+  if (array[26].visibility > ratioSettings.threshold || array[24].visibility > ratioSettings.threshold){
     updateLimbBones( leftForeArm, right, 7, false, ratioSettings.foreArm )
   }
 
   //leftArm
   let leftArm = calculateTargetVector(array[15], array[13])
-  if (array[15].visibility > ratioSettings.threshold && array[13].visibility > ratioSettings.threshold){
+  if (array[15].visibility > ratioSettings.threshold || array[13].visibility > ratioSettings.threshold){
     updateLimbBones( leftArm, leftForeArm, 8, false, ratioSettings.arm )
   }
 
   //leftUpLeg
   let leftUpLeg = calculateTargetVector(array[25], array[23])
-  if (array[25].visibility > ratioSettings.threshold && array[23].visibility > ratioSettings.threshold){
+  if (array[25].visibility > ratioSettings.threshold || array[23].visibility > ratioSettings.threshold){
     updateUpLeg( leftUpLeg, nY, nY, 41, true, ratioSettings.upLeg)
   }
 
   //leftLeg
   let leftLeg = calculateTargetVector(array[27], array[25])
-  if (array[27].visibility > ratioSettings.threshold && array[25].visibility > ratioSettings.threshold){
+  if (array[27].visibility > ratioSettings.threshold || array[25].visibility > ratioSettings.threshold){
     updateLeg( leftLeg, leftUpLeg.setX(0), leftUpLeg.setZ(0).setZ(0), 42, true, ratioSettings.leg )
   }
 
-  //  arrowHelperUp.setDirection(rightLeg)
+    arrowHelperUp.setDirection(rightForeArm)
   //  arrowHelperFront.setDirection(midright)
 }
 
 onMounted( async () => {
+  console.log(props.type)
   instance = getCurrentInstance()
   loadMap(1, 'pisa')
   canvasdom.value.appendChild(renderer.domElement)
@@ -759,12 +762,8 @@ onMounted( async () => {
     canvasCtx.save();
     let ratio = 12
     let bias = 8.5
-    if( results.poseWorldLandmarks ) {
-      let array = keypoint.map( (value, index) => {
-        value.position.set( -results.poseWorldLandmarks[index].x * ratio, -results.poseWorldLandmarks[index].y * ratio + bias, results.poseWorldLandmarks[index].z * ratio)
-      })
-
-    }
+    let angle, upVec
+    let rotatedV = new THREE.Vector3()
     canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     // Only overwrite existing pixels.
     canvasCtx.globalCompositeOperation = 'source-in';
@@ -783,12 +782,37 @@ onMounted( async () => {
                   {color: '#FF0000', lineWidth: 2});
     canvasCtx.restore();
     if(results.poseWorldLandmarks && settings.value.mcEnabled) {
-      updateSkeleton(results.poseWorldLandmarks.map((item) => ({
-        x: item.x * ratio,
-        y: -item.y * ratio + bias,
-        z: item.z * ratio,
-        visibility: item.visibility,
-      })))
+      let array = results.poseWorldLandmarks.map((item) => {
+        return {
+          x: item.x * ratio,
+          y: -item.y * ratio + bias,
+          z: item.z * ratio,
+          visibility: item.visibility
+        }
+      })
+      let moveVec = new THREE.Vector3( 0, -(array[23].y + array[24].y) / 2, -(array[23].z + array[24].z) / 2)
+      upVec = new THREE.Vector3(
+        0,
+        (array[11].y + array[12].y) / 2 - (array[23].y + array[24].y) / 2,
+        (array[11].z + array[12].z) / 2 - (array[23].z + array[24].z) / 2
+      )
+      arrowHelperFront.setDirection(upVec.normalize())
+      angle = upVec.lerp(y, ratioSettings.cameraRotationFixRatio).angleTo(y)
+      console.log(RToA(angle))
+      let rotatedArray = array.map( (item, index) => {
+        let temp = new THREE.Vector3( item.x, item.y, item.z).add(moveVec) .applyAxisAngle( x, angle ).add(moveVec.clone().negate())
+        return {
+          x: temp.x,
+          y: temp.y,
+          z: temp.z,
+          visibility: item.visibility
+        }
+      })
+
+      keypoint.map( (value, index) => {
+        value.position.set( rotatedArray[index].x, rotatedArray[index].y, rotatedArray[index].z)
+      })
+      updateSkeleton(rotatedArray)
     }
   }
 
@@ -804,37 +828,38 @@ onMounted( async () => {
     minTrackingConfidence: 0.6
   });
   pose.onResults(onResults);
-  // if( props.type == 'video') {
 
-  //   const fileInput = inputVideo.value
-  //   await nextTick()
+  if( props.type == 'video') {
 
-  //   fileInput.addEventListener( "change", () => {
-  //     const file = fileInput.files[0]
-  //     const reader = new FileReader()
-  //     reader.addEventListener( "load", async () => {
-  //       showVideo.value = !showVideo.value
-  //       await nextTick()
-  //       const videoElement = document.getElementsByClassName('input_video')[0];
-  //       videoPlayer.value.src = reader.result
-  //       videoElement.addEventListener("timeupdate", async () => {
-  //         await pose.send({image: videoElement});
-  //       })
-  //     })
-  //     reader.readAsDataURL(file)
-  //   })
+    const fileInput = inputVideo.value
+    await nextTick()
+
+    fileInput.addEventListener( "change", () => {
+      const file = fileInput.files[0]
+      const reader = new FileReader()
+      reader.addEventListener( "load", async () => {
+        showVideo.value = !showVideo.value
+        await nextTick()
+        const videoElement = document.getElementsByClassName('input_video')[0];
+        videoPlayer.value.src = reader.result
+        videoElement.addEventListener("timeupdate", async () => {
+          await pose.send({image: videoElement});
+        })
+      })
+      reader.readAsDataURL(file)
+    })
 
 
-  // }
+  }
 
-  const camera = new Camera(videoElement, {
-    onFrame: async () => {
-      await pose.send({image: videoElement});
-    },
-    width: 500,
-    height: 450
-  });
-  camera.start();
+  // const camera = new Camera(videoElement, {
+  //   onFrame: async () => {
+  //     await pose.send({image: videoElement});
+  //   },
+  //   width: 500,
+  //   height: 450
+  // });
+  // camera.start();
 
   // videoElement.addEventListener("timeupdate", async () => {
   //   await pose.send({image: videoElement});
@@ -961,7 +986,7 @@ watch(visible, async () => {
         <!-- <video class="input_video" width="430" height="300" autoplay src="./assets/videos/1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"
         muted="true" controls ref="videoPlayer"></video> -->
         <video class="input_video" width="500" height="450"></video>
-        <!-- <input type="file" ref="inputVideo" v-if="props.type == 'video'"> -->
+        <input type="file" ref="inputVideo" v-if="props.type == 'video'">
       </var-paper>
       <var-paper :elevation="12" :radius="10" class="skeleton" >
         <!-- <canvas class="output_canvas" :width="videoSize.width" :height="videoSize.height" :style="{'display': loading ? 'none' : 'flex'}" ></canvas> -->

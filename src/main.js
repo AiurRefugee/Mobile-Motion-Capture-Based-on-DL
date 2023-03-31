@@ -7,7 +7,7 @@ import './assets/main.css'
 import Varlet from '@varlet/ui'
 import '@varlet/ui/es/style'
 
-const app = createApp(mc)
+const app = createApp(App)
 
 app.use(Varlet)
 
