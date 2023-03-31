@@ -5,7 +5,7 @@ import { onMounted, ref, watch, nextTick, getCurrentInstance } from 'vue'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
-import { StyleProvider, Themes, Snackbar } from '@varlet/ui'
+import { StyleProvider, Themes } from '@varlet/ui'
 import { TransformControls } from 'three-transform-controls/TransformControls.js';
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
 // import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
@@ -24,6 +24,7 @@ const link = document.createElement( 'a' );
 link.style.display = 'none';
 let arrowHelperFront
 let arrowHelperUp
+let image
 let arrowHelperRight
 let skeleton
 let x = new THREE.Vector3(1, 0, 0)
@@ -37,10 +38,8 @@ const raycaster = new THREE.Raycaster()
 raycaster.far = Number.MAX_VALUE
 raycaster.near = 10
 const mouse = new THREE.Vector2()
-var loading = ref(true)
 var lastSelected = null
 var lastSelectTime = new Date().getTime()
-var nowSelect = ref(null)
 var lastColor = null
 const cubeRenderTarget = new THREE.WebGLCubeRenderTarget( 256 );
 const cubeCamera = new THREE.CubeCamera( 1, 1000, cubeRenderTarget );
@@ -61,6 +60,9 @@ let ratioSettings = {
 const props = defineProps(['type'])
 
 //ref
+var loading = ref(true)
+var src = ref(null)
+var nowSelect = ref(null)
 var videoPlayer = ref( null )
 var showVideo = ref( false )
 let inputVideo = ref( null )
@@ -824,33 +826,60 @@ onMounted( async () => {
     smoothLandmarks: true,
     enableSegmentation: false,
     smoothSegmentation: false,
+    static_image_mode: true,
     minDetectionConfidence: 0.6,
     minTrackingConfidence: 0.6
   });
   pose.onResults(onResults);
 
-  if( props.type == 'video') {
+  // if( props.type == 'video') {
+
+  //   const fileInput = inputVideo.value
+  //   await nextTick()
+
+  //   fileInput.addEventListener( "change", () => {
+  //     const file = fileInput.files[0]
+  //     const reader = new FileReader()
+  //     reader.addEventListener( "load", async () => {
+  //       showVideo.value = !showVideo.value
+  //       await nextTick()
+  //       const videoElement = document.getElementsByClassName('input_video')[0];
+  //       videoPlayer.value.src = reader.result
+  //       videoElement.addEventListener("timeupdate", async () => {
+  //         await pose.send({image: videoElement});
+  //       })
+  //     })
+  //     reader.readAsDataURL(file)
+  //   })
+
+
+  // }
+
+if( props.type == 'image') {
 
     const fileInput = inputVideo.value
     await nextTick()
 
-    fileInput.addEventListener( "change", () => {
+    fileInput.addEventListener( "change", async () => {
       const file = fileInput.files[0]
       const reader = new FileReader()
       reader.addEventListener( "load", async () => {
         showVideo.value = !showVideo.value
         await nextTick()
         const videoElement = document.getElementsByClassName('input_video')[0];
-        videoPlayer.value.src = reader.result
-        videoElement.addEventListener("timeupdate", async () => {
-          await pose.send({image: videoElement});
-        })
+        src.value = reader.result
+        image = new Image()
+        image.src = src.value
+        console.log(image)
+        await pose.send({image: image})
       })
       reader.readAsDataURL(file)
+
     })
 
 
   }
+
 
   // const camera = new Camera(videoElement, {
   //   onFrame: async () => {
@@ -874,6 +903,7 @@ const render = async () => {
 
 
 
+
 watch(fullscreen, async () => {
   await nextTick()
   updateThree()
@@ -883,6 +913,8 @@ watch(visible, async () => {
   await nextTick()
   updateThree()
 })
+
+
 
 </script>
 
@@ -985,9 +1017,12 @@ watch(visible, async () => {
         muted="true" controls v-if="props.type == 'video' && showVideo == true" ref="videoPlayer"></video> -->
         <!-- <video class="input_video" width="430" height="300" autoplay src="./assets/videos/1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"
         muted="true" controls ref="videoPlayer"></video> -->
-        <video class="input_video" width="500" height="450"></video>
-        <input type="file" ref="inputVideo" v-if="props.type == 'video'">
-      </var-paper>
+        <!-- <video class="input_video" width="500" height="450"></video>
+        <input type="file" ref="inputVideo" v-if="props.type == 'video'"> -->
+        <var-image :src="src" width="500" height="450" v-if="showVideo"></var-image>
+        <image id="preview" ></image>
+        <input type="file" ref="inputVideo" v-if="props.type == 'image'">
+        </var-paper>
       <var-paper :elevation="12" :radius="10" class="skeleton" >
         <!-- <canvas class="output_canvas" :width="videoSize.width" :height="videoSize.height" :style="{'display': loading ? 'none' : 'flex'}" ></canvas> -->
         <canvas class="output_canvas" width="500" height="450" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
