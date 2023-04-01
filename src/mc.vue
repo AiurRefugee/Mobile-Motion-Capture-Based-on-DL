@@ -60,12 +60,14 @@ let ratioSettings = {
 const props = defineProps(['type'])
 
 //ref
+let gui = ref(null)
 var loading = ref(true)
 var src = ref(null)
 var nowSelect = ref(null)
 var videoPlayer = ref( null )
-var showVideo = ref( false )
+var showInput = ref( false )
 let inputVideo = ref( null )
+let inputImage = ref( null )
 const finished = ref(false)
 var showlist = ref(false)
 const video = ref(null)
@@ -740,11 +742,11 @@ function updateSkeleton(array) {
 }
 
 onMounted( async () => {
-  console.log(props.type)
+  gui.value.appendChild(guiFolder.domElement)
   instance = getCurrentInstance()
   loadMap(1, 'pisa')
   canvasdom.value.appendChild(renderer.domElement)
-  videoPlayer.value.appendChild(guiFolder.domElement)
+
   addRatio()
 
   canvasdom.value.addEventListener('mousemove', (event) => {
@@ -832,45 +834,45 @@ onMounted( async () => {
   });
   pose.onResults(onResults);
 
-  // if( props.type == 'video') {
-
-  //   const fileInput = inputVideo.value
-  //   await nextTick()
-
-  //   fileInput.addEventListener( "change", () => {
-  //     const file = fileInput.files[0]
-  //     const reader = new FileReader()
-  //     reader.addEventListener( "load", async () => {
-  //       showVideo.value = !showVideo.value
-  //       await nextTick()
-  //       const videoElement = document.getElementsByClassName('input_video')[0];
-  //       videoPlayer.value.src = reader.result
-  //       videoElement.addEventListener("timeupdate", async () => {
-  //         await pose.send({image: videoElement});
-  //       })
-  //     })
-  //     reader.readAsDataURL(file)
-  //   })
-
-
-  // }
-
-if( props.type == 'image') {
+  if( props.type == 'video') {
 
     const fileInput = inputVideo.value
+    await nextTick()
+
+    fileInput.addEventListener( "change", () => {
+      const file = fileInput.files[0]
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.addEventListener( "load", async () => {
+        showInput.value = !showInput.value
+        await nextTick()
+        const videoElement = document.getElementsByClassName('input_video')[0];
+        console.log(file)
+        videoPlayer.value.src = reader.result
+        videoElement.addEventListener("timeupdate", async () => {
+          await pose.send({image: videoElement});
+        })
+      })
+
+    })
+
+
+  }
+
+  if( props.type == 'image' ) {
+    const fileInput = inputImage.value
     await nextTick()
 
     fileInput.addEventListener( "change", async () => {
       const file = fileInput.files[0]
       const reader = new FileReader()
       reader.addEventListener( "load", async () => {
-        showVideo.value = !showVideo.value
+        showInput.value = !showInput.value
         await nextTick()
-        const videoElement = document.getElementsByClassName('input_video')[0];
         src.value = reader.result
         image = new Image()
         image.src = src.value
-        console.log(image)
+        console.log(src.value)
         await pose.send({image: image})
       })
       reader.readAsDataURL(file)
@@ -879,20 +881,20 @@ if( props.type == 'image') {
 
 
   }
+  if( props.type == 'camera' ){
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await pose.send({image: videoElement});
+      },
+      width: 500,
+      height: 400
+    });
+    camera.start();
+    videoElement.addEventListener("timeupdate", async () => {
+      await pose.send({image: videoElement});
+    })
+  }
 
-
-  // const camera = new Camera(videoElement, {
-  //   onFrame: async () => {
-  //     await pose.send({image: videoElement});
-  //   },
-  //   width: 500,
-  //   height: 450
-  // });
-  // camera.start();
-
-  // videoElement.addEventListener("timeupdate", async () => {
-  //   await pose.send({image: videoElement});
-  // })
 })
 
 const render = async () => {
@@ -972,18 +974,6 @@ watch(visible, async () => {
               网格
               </var-cell>
           </var-swipe-item>
-          <!-- <var-swipe-item class="swipe-item">
-              <var-cell >
-              <var-icon name="white-balance-sunny" size="20"/>
-              光源
-              </var-cell>
-          </var-swipe-item>
-          <var-swipe-item class="swipe-item">
-              <var-cell >
-              <var-icon name="src/assets/icons/声音.svg" size="20"/>
-              声音
-              </var-cell>
-          </var-swipe-item> -->
           <var-swipe-item class="swipe-item">
               <var-cell >
               <var-icon name="image" size="20"/>
@@ -1002,31 +992,27 @@ watch(visible, async () => {
 
       </div>
     </var-paper>
-
-      <var-paper :elevation="12" :radius="10" class="lhalf">
-        <div ref="canvasdom" ></div>
+    <var-paper :elevation="12" :radius="10" class="lhalf">
+      <div ref="canvasdom" ></div>
+    </var-paper>
+    <div :class="[!fullscreen ? 'half' : 'noDisplay']">
+      <var-paper :elevation="12" :radius="10" class="skeleton" v-if="props.type == 'image'">
+        <var-image :src="src" width="500" height="400" v-if="showInput"></var-image>
+        <image id="preview" style="display: none;"></image>
+        <input type="file" ref="inputImage">
       </var-paper>
-
-
-    <div :class="[!fullscreen ? 'half' : 'noDisplay']" ref="videoPlayer">
-      <var-paper :elevation="12" :radius="10" class="skeleton">
-        <!-- <video class="input_video" width="430" height="300" autoplay src="./assets/videos/1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"
-        muted="true" controls v-if="props.type == 'video' && showVideo == true" ref="videoPlayer"></video> -->
-        <!-- <video class="input_video" width="430" height="300" autoplay src="./assets/videos/1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"
-        muted="true" controls ref="videoPlayer"></video> -->
-        <!-- <video class="input_video" width="500" height="450"></video>
-        <input type="file" ref="inputVideo" v-if="props.type == 'video'"> -->
-        <var-image :src="src" width="500" height="450" v-if="showVideo"></var-image>
-        <image id="preview" ></image>
-        <input type="file" ref="inputVideo" v-if="props.type == 'image'">
-        </var-paper>
+      <var-paper :elevation="12" :radius="10" class="skeleton" v-if="props.type == 'video'">
+        <video class="input_video" width="500" height="400" ref="videoPlayer" v-if="showInput" controls muted src="./1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"></video>
+        <input type="file" ref="inputVideo">
+      </var-paper>
+      <var-paper :elevation="12" :radius="10" class="skeleton" v-if="props.type == 'camera'">
+        <video class="input_video" width="500" height="450"></video>
+      </var-paper>
       <var-paper :elevation="12" :radius="10" class="skeleton" >
-        <!-- <canvas class="output_canvas" :width="videoSize.width" :height="videoSize.height" :style="{'display': loading ? 'none' : 'flex'}" ></canvas> -->
         <canvas class="output_canvas" width="500" height="450" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
-
         <var-loading v-show="loading" type="wave" size="large"/>
-
       </var-paper>
+      <div class="skeleton" ref="gui"></div>
     </div>
 
   </var-paper>
@@ -1203,11 +1189,13 @@ $sidebarFontSize: 20px;
       flex-shrink: 0;
       //border: 2px solid black;
       .skeleton{
-        @include center();
+        display: flex;
         flex-direction: column;
+        align-items: center;
+        justify-content: space-around;
         flex-shrink: 0;
         width: 500px;
-        height: 450px;
+        height: 400px;
       }
     }
 
