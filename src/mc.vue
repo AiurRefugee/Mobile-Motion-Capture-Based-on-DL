@@ -962,9 +962,6 @@ watch(visible, async () => {
       <text>截屏</text>
       <var-icon name="camera" size="30"/>
     </var-cell>
-    <var-button type="primary" block @click="addSphere">
-      左侧弹出
-    </var-button>
   </var-paper>
   <var-paper class="slidebar" v-if="visible" :elevation="12">
       <var-cell border class="top" :elevation="24" >

@@ -16,6 +16,8 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath( 'three/examples/js/libs/draco/gltf' );
 loader.setDRACOLoader( dracoLoader );
 
+let nullVec = new THREE.Vector3(0, 0, 0)
+
 //ref
 const canvasdom = ref(null)
 var inputType = ref(null)
@@ -77,61 +79,6 @@ scene.add(light);
 
 let geometry = new THREE.BufferGeometry()
 
-// let particles = 20
-// let radius = 20
-// const positions = []
-// const sizes = []
-// for ( let i = 0; i < particles; i ++ ) {
-
-//   positions.push( ( Math.random() * 2 - 1 ) * radius )
-//   positions.push( ( Math.random() * 2 - 1 ) * radius )
-//   positions.push( ( Math.random() * 2 - 1 ) * radius )
-
-//   sizes.push( Math.random() * 2  + 10)
-// }
-
-// geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( positions, 3 ) );
-// geometry.setAttribute( 'size', new THREE.Float32BufferAttribute( sizes, 1 ).setUsage( THREE.DynamicDrawUsage ) );
-
-// const particleMaterial = new THREE.ShaderMaterial({
-//   uniforms: {
-//     time: { value: 0 },
-//     intensity: { value: 1 },
-//     color: { value: new THREE.Color(0xff0000) }
-//   },
-//   vertexShader: `
-//     uniform float time;
-//     uniform float intensity;
-//     attribute float size;
-//     varying vec3 vColor;
-//     void main() {
-//       vColor = vec3(1.0, 0.0, 0.0); // 红色
-//       vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-//       gl_PointSize = size * (100.0 / length(mvPosition.xyz));
-//       gl_Position = projectionMatrix * mvPosition;
-//     }
-//   `,
-//   fragmentShader: `
-//     uniform float time;
-//     uniform float intensity;
-//     uniform vec3 color;
-//     varying vec3 vColor;
-//     void main() {
-//       float alpha = 1.0 - length(gl_PointCoord.xy - vec2(0.5)) * 2.0;
-//       alpha = pow(alpha, 3.0);
-//       gl_FragColor = vec4(color * intensity * alpha, 1.0);
-//     }
-//   `,
-//   blending: THREE.AdditiveBlending,
-//   depthTest: false,
-//   transparent: true,
-//   vertexColors: true
-// });
-
-// let particleSystem = new THREE.Points( geometry, particleMaterial );
-// console.log('a', geometry)
-// scene.add( particleSystem );
-
 const genCubeUrls = function ( prefix, postfix ) {
 
   return [
@@ -145,18 +92,19 @@ const genCubeUrls = function ( prefix, postfix ) {
 
 
 
-function trans() {
+function trans( x, y, z, input ) {
   gsap.to(
     camera.position,{
-      x: 20,
-      y: 40,
-      z: 20,
+      x: x,//20
+      y: y,//40
+      z: z,//20
       duration: 2,
       onComplete: () => {
+        inputType.value = input
         mcVisible.value = !mcVisible.value
       },
       onUpdate: () => { // 更新相机朝向
-        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        camera.lookAt(nullVec);
       },
     }
   )
@@ -365,15 +313,15 @@ onMounted( () => {
 
 
         <var-row class="inputIcons" justify="center" align="center">
-          <var-col :span="6" justify="justify" direction="column" @click="inputType = 'image'; mcVisible = !mcVisible">
+          <var-col :span="6" justify="justify" direction="column" @click="trans(20, 30, 0, 'image')">
               <var-icon name="image" size="200"></var-icon>
               <div class="text">从图片输入</div>
           </var-col>
-          <var-col :span="6" justify="justify" direction="column" @click="inputType = 'video'; mcVisible = !mcVisible">
+          <var-col :span="6" justify="justify" direction="column" @click="trans(-20, 30, 0, 'video')">
               <var-icon name="play-circle" size="200"></var-icon>
               <div class="text">从视频输入</div>
           </var-col>
-          <var-col :span="6" justify="justify" direction="column" @click="inputType = 'camera'; mcVisible = !mcVisible">
+          <var-col :span="6" justify="justify" direction="column" @click="trans(10, 40, -20, 'camera')">
               <var-icon name="radio-marked" size="200"></var-icon>
               <div class="text">从摄像头输入</div>
           </var-col>
