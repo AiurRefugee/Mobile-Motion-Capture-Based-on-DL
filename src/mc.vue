@@ -72,7 +72,7 @@ const finished = ref(false)
 var showlist = ref(false)
 const video = ref(null)
 var sidebarIconSize = ref(25)
-var visible = ref(true)
+var visible = ref(false)
 var showLeft = ref(true)
 const active = ref(0)
 let currentTheme = null
@@ -248,7 +248,7 @@ const genCubeUrls = function ( prefix, postfix ) {
 };
 
 function addRatio() {
-  let mcratio = guiFolder.addFolder( 'MotionCapture Ratios' )
+  let mcratio = guiFolder.addFolder( 'Ratios' )
   mcratio.add( ratioSettings, 'head' , 0.5, 2 )
   mcratio.add( ratioSettings, 'shoulder' , 0.5, 2 )
   mcratio.add( ratioSettings, 'foreArm' , 0.5, 2 )
@@ -923,61 +923,61 @@ watch(visible, async () => {
 <template>
 <var-paper class="mcContainer" >
   <var-paper class="sidebar" :elevation="20">
-    <var-cell border ripple class="menuItem" :elevation="18" @click="returnApp">
-        <text>返回</text>
+    <var-cell :border="false" ripple class="menuItem" :elevation="18" @click="returnApp">
+        <div class="sidebarText">返回</div>
         <var-icon name="chevron-left" :size="sidebarIconSize" />
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="setmode(0)" :style="{'background-color': interactType == 0 ? '#636b80d3' : 'transparent'}">
-        <text>移动</text>
+    <var-cell :border="false" ripple class="menuItem" @click="setmode(0)" :style="{'background-color': interactType == 0 ? '#636b80d3' : 'transparent'}">
+        <div class="sidebarText">移动</div>
         <var-icon name="src/assets/icons/移动.svg" :size="sidebarIconSize" color="#2979ff"/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="setmode(1)" :style="{'background-color': interactType == 1 ? '#636b80d3' : 'transparent'}">
-        <text>旋转</text>
+    <var-cell :border="false" ripple class="menuItem" @click="setmode(1)" :style="{'background-color': interactType == 1 ? '#636b80d3' : 'transparent'}">
+        <div class="sidebarText">旋转</div>
         <var-icon name="src/assets/icons/旋转.svg" :size="sidebarIconSize" color="#2979ff"/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="setmode(2)" :style="{'background-color': interactType == 2 ? '#636b80d3' : 'transparent'}">
-        <text>缩放</text>
+    <var-cell :border="false" ripple class="menuItem" @click="setmode(2)" :style="{'background-color': interactType == 2 ? '#636b80d3' : 'transparent'}">
+        <div class="sidebarText">缩放</div>
         <var-icon name="src/assets/icons/缩放.svg" :size="sidebarIconSize"/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="visible = !visible; pointer = 0">
-        <text>编辑</text>
+    <var-cell :border="false" ripple class="menuItem" @click="visible = !visible; pointer = 0">
+        <div class="sidebarText">编辑</div>
         <var-icon name="menu" :size="sidebarIconSize" v-if="!visible" :transition="300"/>
         <var-icon name="menu-open" :size="sidebarIconSize" v-else/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="remove">
-        <text>删除</text>
+    <var-cell :border="false" ripple class="menuItem" @click="remove">
+        <div class="sidebarText">删除</div>
         <var-icon name="trash-can-outline" :size="sidebarIconSize"/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="exportScene">
-        <text>导出</text>
+    <var-cell :border="false" ripple class="menuItem" @click="exportScene">
+        <div class="sidebarText">导出</div>
         <var-icon name="upload" :size="sidebarIconSize"/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="fullscreen = !fullscreen">
-        <text>全屏</text>
+    <var-cell :border="false" ripple class="menuItem" @click="fullscreen = !fullscreen">
+        <div class="sidebarText">全屏</div>
         <var-switch v-model="fullscreen" :size="sidebarIconSize/2" @click.stop/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="settings.mcEnabled = !settings.mcEnabled">
-      <text>动捕</text>
+    <var-cell :border="false" ripple class="menuItem" @click="settings.mcEnabled = !settings.mcEnabled">
+      <div class="sidebarText">动捕</div>
       <var-switch v-model="settings.mcEnabled" :size="sidebarIconSize/2" @click.stop/>
     </var-cell>
-    <var-cell border ripple class="menuItem" @click="screenshot">
-      <text>截屏</text>
+    <var-cell :border="false" ripple class="menuItem" @click="screenshot">
+      <div class="sidebarText">截屏</div>
       <var-icon name="camera" size="30"/>
     </var-cell>
   </var-paper>
   <var-paper class="slidebar" v-if="visible" :elevation="12">
-      <var-cell border class="top" :elevation="24" >
+      <var-cell :border="false" class="top" :elevation="24" >
         <var-swipe indicator-color="gray" @change="(index) => {addpointer = index}">
-          <var-swipe-item class="swipe-item">
+          <var-swipe-item class="swipe-item" >
               <var-cell >
-              <var-icon name="src/assets/icons/立方体.svg" size="20"/>
-              网格
+                <var-icon name="src/assets/icons/立方体.svg" size="20"/>
+                <div style="width: 200px">网格</div>
               </var-cell>
           </var-swipe-item>
           <var-swipe-item class="swipe-item">
               <var-cell >
-              <var-icon name="image" size="20"/>
-              背景
+                <var-icon name="image" size="20"/>
+                <div style="width: 200px">背景</div>
               </var-cell>
           </var-swipe-item>
         </var-swipe>
@@ -996,7 +996,7 @@ watch(visible, async () => {
       <div ref="canvasdom" ></div>
     </var-paper>
     <div :class="[!fullscreen ? 'half' : 'noDisplay']">
-      <var-paper :elevation="12" :radius="10" class="skeleton" v-if="props.type == 'image'">
+      <var-paper :elevation="12" :radius="10" class="skeleton input" v-if="props.type == 'image'">
         <var-image :src="src" width="500" height="400" v-if="showInput"></var-image>
         <image id="preview" style="display: none;"></image>
         <input type="file" ref="inputImage">
@@ -1008,11 +1008,11 @@ watch(visible, async () => {
       <var-paper :elevation="12" :radius="10" class="skeleton" v-if="props.type == 'camera'">
         <video class="input_video" width="500" height="450"></video>
       </var-paper>
-      <var-paper :elevation="12" :radius="10" class="skeleton" >
+      <var-paper :elevation="12" :radius="10" class="skeleton" style="align-items: center;" >
         <canvas class="output_canvas" width="500" height="450" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
         <var-loading v-show="loading" type="wave" size="large"/>
       </var-paper>
-      <div class="skeleton" ref="gui"></div>
+      <div class="skeleton gui" ref="gui"></div>
     </div>
 
   </var-paper>
@@ -1057,6 +1057,11 @@ $sidebarFontSize: 20px;
   border-radius: 10px;
   display: none;
 }
+input{
+  @media (max-width: 1000px) {
+    width: 50px;
+  }
+}
 :deep(.root) {
   width: 100%;
   border-radius: 15px;
@@ -1078,16 +1083,35 @@ $sidebarFontSize: 20px;
   width: 100%;
   height: 100%;
 }
-// :deep(.var-swipe__indicators){
-//   bottom: 0;
-// }
+:deep(.root){
+  padding: 1%;
+}
+:deep(.slider ){
+  @media (max-width: 1000px) {
+    width: 150px;
+  }
+}
+:deep(.controller){
+  @media (max-width: 1000px) {
+    height: 30px;
+  }
+}
+:deep(.title){
+  @media (max-width: 1000px) {
+    height: 30px;
+  }
+}
 .mcContainer{
   display: flex;
   width: 100vw;
   height: 100vh;
   align-items: center;
+  @media (max-width: 1000px) {
+    //flex-direction: column;
+    flex-direction: column-reverse;
+  }
   .sidebar{
-      width: 8%;
+      width: 5%;
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -1096,16 +1120,32 @@ $sidebarFontSize: 20px;
       //background-color: $blueLite;
       flex-shrink: 0;
       padding-bottom: 6%;
-      .menuItem{
+      @media (max-width: 1000px) {
+        flex-direction: row;
         width: 100%;
+        height: 8%;
+        justify-content: flex-start;
+        align-items: center;
+        overflow: auto;
+        padding-bottom: 0;
+      }
+      .menuItem{
+        width: 100px;
         display: flex;
-        flex: 1;
         justify-content: space-between;
         align-items: center;
         //margin: 2%;
         //padding: 10%;
         font-size: $sidebarFontSize;
         cursor: pointer;
+        @media (max-width: 1000px) {
+          width: 100px;
+          height: 100%;
+          flex-direction: column;
+        }
+        .sidebarText{
+          width: 100px;
+        }
       }
       .withSwitch{
         align-items: flex-start;
@@ -1122,6 +1162,11 @@ $sidebarFontSize: 20px;
       justify-content: center;
       align-items: flex-start;
       transition: transform 0.5s ease-out;
+      @media (max-width: 1000px) {
+        width: 100%;
+        height: 15%;
+        flex-direction: row;
+      }
       //margin-left: 1%;
       //border: 5px solid $blueFull;
       .top{
@@ -1129,9 +1174,7 @@ $sidebarFontSize: 20px;
         width: 100%;
         height: 5%;
         padding: 0;
-        //background-color: gray;
         padding-left: 2%;
-        align-items: center;
         font-size: 20px;
         //border-bottom: 5px solid $blueFull;
         :deep(.var-cell__content){
@@ -1140,13 +1183,23 @@ $sidebarFontSize: 20px;
           width: 100%;
           height: 100%;
         }
+        @media (max-width: 1000px) {
+          width: 20%;
+          height: 100%;
+        }
         .swipe-item {
           width: 100%;
           height: 100%;
           object-fit: cover;
           pointer-events: none;
+          padding-left: 13%;
           @include center();
           font-size: 20px;
+          @media (max-width: 1000px) {
+            width: 100%;
+            height: 100%;
+            flex-direction: column;
+          }
         }
       }
       .down{ display: flex;
@@ -1155,12 +1208,25 @@ $sidebarFontSize: 20px;
         overflow: auto;
         width: 100%;
         flex: 1;
+        @media (max-width: 1000px) {
+          height: 100%;
+          flex-direction: row;
+          justify-content: center;
+          align-items: center;
+          overflow: auto;
+        }
         .footImages{
           width: 80%;
+          margin: 1%;
           aspect-ratio: 1 / 1;
-          flex-shrink: 0;
+          //flex-shrink: 0;
           //border: 2px solid $blueLite;
           margin-top: 15px;
+          @media (max-width: 1000px) {
+            height: 100%;
+            width: 200px;
+            margin-top: 0;
+          }
         }
       }
     }
@@ -1174,10 +1240,10 @@ $sidebarFontSize: 20px;
       height: 95%;
       width: 42vw;
       margin: 1vw;
-      // animation-name: flash;
-      // /* 设置动画持续时间为1秒 */
-      // animation-duration: 1s;
-      //border: 2px solid black;
+      @media (max-width: 1000px) {
+        height: 60%;
+        width: 95%;
+      }
     }
     .half{
       display: flex;
@@ -1187,7 +1253,11 @@ $sidebarFontSize: 20px;
       height: 95%;
       margin: 1%;
       flex-shrink: 0;
-      //border: 2px solid black;
+      @media (max-width: 1000px) {
+        height: 20%;
+        width: 95%;
+        flex-direction: row;
+      }
       .skeleton{
         display: flex;
         flex-direction: column;
@@ -1196,6 +1266,23 @@ $sidebarFontSize: 20px;
         flex-shrink: 0;
         width: 500px;
         height: 400px;
+        overflow: auto;
+        border-radius: 10px;
+        @media (max-width: 1000px) {
+          display: flex;
+          height: 90%;
+          width: 48%;
+        }
+      }
+      .input{
+        @media (max-width: 1000px) {
+          width: 15%;
+        }
+      }
+      .gui{
+        justify-content: flex-start;
+        overflow: auto;
+        flex: 1;
       }
     }
 

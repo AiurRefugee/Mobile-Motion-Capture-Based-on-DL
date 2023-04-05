@@ -19,11 +19,14 @@ loader.setDRACOLoader( dracoLoader );
 let nullVec = new THREE.Vector3(0, 0, 0)
 
 //ref
+var pos = ref('left')
+var iconsize = ref('200')
+var topTextSize = ref('20')
 const canvasdom = ref(null)
 var inputType = ref(null)
 const cubeMapLoader = ref(new THREE.CubeTextureLoader())
 var currentTheme = ref(null)
-const topbarIconSize = 40
+const topbarIconSize = ref(40)
 var showMediapipe = ref(false)
 var showThree = ref(false)
 var showVue = ref(false)
@@ -241,7 +244,12 @@ loader.load(
 
 onMounted( () => {
   console.log('onMounted')
-
+  if( window.innerWidth < 1000 ){
+    pos.value = 'bottom'
+    iconsize.value = 80
+    topTextSize.value = 16
+    topbarIconSize.value = 16
+  }
   canvasdom.value.appendChild(renderer.domElement)
 
   // setInterval( () => {
@@ -257,45 +265,45 @@ onMounted( () => {
 
   <div class="appContainer" v-if="!mcVisible">
     <div class="three" ref="canvasdom"></div>
-    <var-popup v-model:show="showMediapipe" position="left" style="width: 20vw;">
-      <var-cell border>
+    <var-popup v-model:show="showMediapipe" :position="pos" >
+      <var-cell :border="true">
         <var-image src="src/assets/preview/textures/m1.png"></var-image>
       </var-cell>
       <var-cell>MediaPipe是一个多平台的，性能优秀的深度学习工具包，提供了实现面部检测，面部网格体检测，手势识别，3维人体姿态估计等功能，并且提供了丰富的接口，包括c++，python，和javascript。</var-cell>
     </var-popup>
-    <var-popup v-model:show="showThree" position="left" style="width: 20vw;">
-      <var-cell border>
+    <var-popup v-model:show="showThree" :position="pos" >
+      <var-cell :border="true">
         <var-image src="src/assets/preview/textures/m2.png"></var-image>
       </var-cell>
       <var-cell>Three.js是一个尽可能简化在网页端获取3D 内容的库。Three.js经常会和WebGL混淆， 但也并不总是，three.js其实是使用WebGL来绘制三维效果的。 WebGL是一个只能画点、线和三角形的非常底层的系统. 想要用WebGL来做一些实用的东西通常需要大量的代码， 这就是Three.js的用武之地。它封装了诸如场景、灯光、阴影、材质、贴图、空间运算等一系列功能，让你不必要再从底层WebGL开始写起。</var-cell>
     </var-popup>
-    <var-popup v-model:show="showVue" position="left" style="width: 20vw;">
-      <var-cell border>
+    <var-popup v-model:show="showVue" :position="pos" >
+      <var-cell :border="true">
         <var-image src="src/assets/preview/textures/m3.png"></var-image>
       </var-cell>
       <var-cell>Vue 是一个框架，也是一个生态。其功能覆盖了大部分前端开发常见的需求。但 Web 世界是十分多样化的，不同的开发者在 Web 上构建的东西可能在形式和规模上会有很大的不同。考虑到这一点，Vue 的设计非常注重灵活性和“可以被逐步集成”这个特点。</var-cell>
     </var-popup>
-    <var-popup v-model:show="showVarletUI" position="left" style="width: 20vw;">
-      <var-cell border>
+    <var-popup v-model:show="showVarletUI" :position="pos" >
+      <var-cell :border="true">
         <var-image src="src/assets/preview/textures/varlet.png"></var-image>
       </var-cell>
       <var-cell>Varlet 是一个基于 Vue3 开发的 Material 风格移动端组件库，全面拥抱 Vue3 生态，由社区团队维护。支持 Typescript、按需引入、暗黑模式、主题定制、国际化，并提供 VSCode 插件保障良好的开发体验。</var-cell>
     </var-popup>
-    <var-cell border class="topBar">
-    <div class="title">Motion Capture Based on DeepLearning</div>
+    <div class="topBar">
+      <div class="title">Motion Capture Based on DeepLearning</div>
       <div class="topbarIcons">
-        <var-row style="width:100%" align="center" justify="flex-end" :gutter="20">
+        <var-row style="width:100%" :align="center" justify="flex-end" :gutter="20">
           <var-col :span="1" justify="center">
-            <var-link text-size="20" underline="hover" @click="showMediapipe = !showMediapipe">Mediapipe</var-link>
+            <var-link :text-size="topTextSize" underline="hover" @click="showMediapipe = !showMediapipe">Mediapipe</var-link>
           </var-col>
           <var-col :span="1" justify="center">
-            <var-link text-size="20" underline="hover" @click="showThree = !showThree">Three</var-link>
+            <var-link :text-size="topTextSize" underline="hover" @click="showThree = !showThree">Three</var-link>
           </var-col>
           <var-col :span="1" justify="center">
-            <var-link text-size="20" underline="hover" @click="showVue = !showThree">Vue</var-link>
+            <var-link :text-size="topTextSize" underline="hover" @click="showVue = !showThree">Vue</var-link>
           </var-col>
           <var-col :span="1" justify="center">
-            <var-link text-size="20" underline="hover" @click="showVarletUI = !showVarletUI">Varlet UI</var-link>
+            <var-link :text-size="topTextSize" underline="hover" @click="showVarletUI = !showVarletUI">Varlet UI</var-link>
           </var-col>
           <var-col :span="1" justify="center">
             <var-icon :name="`${!currentTheme ? 'white-balance-sunny' : 'weather-night'}`" @click="changeTheme" :size="topbarIconSize" :transition="400"/>
@@ -307,22 +315,22 @@ onMounted( () => {
 
 
       </div>
-    </var-cell>
+    </div>
     <div class="main">
       <div class="showArea">
 
 
-        <var-row class="inputIcons" justify="center" align="center">
+        <var-row class="inputIcons" justify="center" :align="center">
           <var-col :span="6" justify="justify" direction="column" @click="trans(20, 30, 0, 'image')">
-              <var-icon name="image" size="200"></var-icon>
+              <var-icon name="image" :size="iconsize"></var-icon>
               <div class="text">从图片输入</div>
           </var-col>
           <var-col :span="6" justify="justify" direction="column" @click="trans(-20, 30, 0, 'video')">
-              <var-icon name="play-circle" size="200"></var-icon>
+              <var-icon name="play-circle" :size="iconsize"></var-icon>
               <div class="text">从视频输入</div>
           </var-col>
           <var-col :span="6" justify="justify" direction="column" @click="trans(10, 40, -20, 'camera')">
-              <var-icon name="radio-marked" size="200"></var-icon>
+              <var-icon name="radio-marked" :size="iconsize"></var-icon>
               <div class="text">从摄像头输入</div>
           </var-col>
         </var-row>
@@ -371,7 +379,10 @@ div{
 :deep(.var-swipe__indicators){
   bottom: 0;
 }
-
+:deep(.var-popup__content){
+  max-width: 50vw;
+  max-height: 60vh;
+}
 .appContainer{
   display: flex;
   flex-direction: column;
@@ -392,13 +403,16 @@ div{
   }
   .topBar{
     width: 100%;
-    height: 8%;
+    min-height: 10%;
     display: flex;
     justify-content: space-between;
+    @media (max-width: 1000px) {
+      flex-direction: column;
+    }
     .title{
-      width: 50%;
-      height: 90%;
-      font-size: 2vw;
+      min-width: 50%;
+      min-height: 8vh;
+      font-size: 50px;
       padding-right: 1%;
       font-style: italic;
       @include center();
@@ -406,12 +420,18 @@ div{
       justify-content: flex-start;
       font-weight: 900;
       font-family: math;
+      @media (max-width: 1000px) {
+        font-size: 20px;
+        width: 100vw;
+      }
     }
     .topbarIcons{
-      flex: 1;
-      height: 90%;
+      min-width: 50%;
       @include center();
-      justify-content: flex-end;
+      @media (max-width: 1000px) {
+        font-size: 20px;
+        width: 100%;
+      }
     }
     :deep(.var-icon){
       margin: 1%;
@@ -420,18 +440,21 @@ div{
   }
   .main{
     display: flex;
-    width: 80vw;
+    width: 100vw;
     flex-grow: 1;
     flex-direction: column;
-    justify-content: center;
+    justify-content: space-around;
     align-items: center;
     .showArea{
-      width: 80%;
+      width: 95%;
       height: 70%;
       display: flex;
       justify-content: flex-start;
-      padding-top: 5%;
-      align-items: center;
+      padding-top: 2%;
+      @media (max-width: 1000px) {
+        padding-top: 0%;
+      }
+      align-items: space-between;
       flex-direction: column;
 
       :deep(.var-col){
@@ -440,10 +463,13 @@ div{
       .inputIcons{
         width: 100%;
         @include center();
-        justify-content: space-between;
+        justify-content: space-around;
         .text{
           @include center();
           font-size: 40px;
+          @media (max-width: 1000px) {
+              font-size: 14px;
+          }
         }
       }
     }
