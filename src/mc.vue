@@ -6,8 +6,11 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { StyleProvider, Themes } from '@varlet/ui'
-import { TransformControls } from 'three-transform-controls/TransformControls.js';
+import { TransformControls } from './TransformControls.js';
 import { GUI } from 'three/examples/jsm/libs/lil-gui.module.min.js';
+// import { Pose, POSE_CONNECTIONS } from "@mediapipe/pose";
+// import { drawConnectors, drawLandmarks } from "@mediapipe/drawing_utils";
+// import { Camera } from "@mediapipe/camera_utils";
 // import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 // import { MMDLoader } from 'three/examples/jsm/loaders/MMDLoader.js';
 // import { MMDAnimationHelper } from 'three/examples/jsm/animation/MMDAnimationHelper.js';
@@ -18,6 +21,7 @@ const gltfExporter = new GLTFExporter();
 dracoLoader.setDecoderPath( 'three/examples/js/libs/draco/gltf' );
 loader.setDRACOLoader( dracoLoader );
 const cubeMapLoader = new THREE.CubeTextureLoader()
+let outputCamera
 let model, INTERSECTED
 let keypoint = []
 const link = document.createElement( 'a' );
@@ -33,6 +37,9 @@ let z = new THREE.Vector3(0, 0, 1)
 let nX = new THREE.Vector3(-1, 0, 0)
 let nY = new THREE.Vector3(0, -1, 0)
 let nZ = new THREE.Vector3(0, 0, -1)
+let rightVec = new THREE.Vector3(1, 0, 0)
+let frontVec = new THREE.Vector3(1, 0, 0)
+let upVec = new THREE.Vector3(1, 0, 0)
 let nullVec = new THREE.Vector3(0, 0, 0)
 const raycaster = new THREE.Raycaster()
 raycaster.far = Number.MAX_VALUE
@@ -46,7 +53,7 @@ const cubeCamera = new THREE.CubeCamera( 1, 1000, cubeRenderTarget );
 let guiFolder = new GUI({ autoPlace: false})
 let ratioSettings = {
   'threshold': 0.8,
-  'cameraRotationFixRatio': 0.5,
+  'cameraRotationFixRatio': 1,
   'head': 1,
   'shoulder': 1,
   'foreArm': 1,
@@ -55,11 +62,34 @@ let ratioSettings = {
   'upLeg': 1,
   'leg': 1
 }
+let lightsSettings = {
+  'intensity': 0.4,
+  'target': {
+    'position': {
+      'x': 0,
+      'y': 0,
+      'z': 0
+    }
+  }
+}
+
+let debugSettings = {
+  keypointVisible: false,
+  axesHelperVisible: false
+}
+//config
+//let baseurl = 'https://4900795f7g.goho.co:443/'
+let baseurl = ''
+
 
 //props
 const props = defineProps(['type'])
 
 //ref
+var videoWidth = ref( 500 )
+var videoHeight = ref( 450)
+var inputVisible = ref(true)
+var isMobile = ref( false )
 let gui = ref(null)
 var loading = ref(true)
 var src = ref(null)
@@ -94,7 +124,7 @@ const previewBaseUrl = [
 'src/assets/preview/models/',
 'src/assets/preview/textures/'
 ]
-const modelBaseUrl = 'src/assets/models/'
+const modelBaseUrl = baseurl + 'src/assets/models/'
 const mapUrls = ref(
   ['none', 'bridge', 'milkyWay', 'park', 'park2', 'pisa', 'wild', 'building']
 )
@@ -118,6 +148,7 @@ const controls = new OrbitControls(camera, renderer.domElement)
 camera.position.z = 10
 
 const axesHelper = new THREE.AxesHelper(10)
+axesHelper.visible = debugSettings.axesHelperVisible
 scene.add(axesHelper)
 
 //scene.add( hemiLight );
@@ -126,7 +157,8 @@ hemiLight.position.set( 0, 5, 0 )
 scene.add( hemiLight );
 
 const dirLight = new THREE.DirectionalLight( 0xffffff )
-dirLight.position.set( - 3, 5,  -5 )
+dirLight.position.set( - 30, 50,  -50 )
+dirLight.intensity = lightsSettings.intensity
 dirLight.castShadow = true
 dirLight.shadow.camera.top = 200
 dirLight.shadow.camera.bottom = - 200
@@ -137,100 +169,33 @@ dirLight.shadow.camera.far = 500
 dirLight.shadow.mapSize.width = 2048 // default 512
 dirLight.shadow.mapSize.height = 2048 // default
 scene.add( dirLight );
+scene.add( dirLight.target )
+
+function updateLight() {
+  dirLight.target.updateMatrixWorld();
+  lightHelper.update();
+}
 
 
-// let lightHelper = new THREE.HemisphereLightHelper( hemiLight );
-// scene.add( lightHelper );
+let lightHelper = new THREE.DirectionalLightHelper( dirLight );
+scene.add( lightHelper );
 
-const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 100, 100 ), new THREE.MeshLambertMaterial( { color: 0x999999, depthWrite: true } ) );
+
+const texture = new THREE.TextureLoader().load('src/assets/textures/brick.jpg');
+texture.wrapS = THREE.RepeatWrapping; // 在横向上重复纹理
+texture.wrapT = THREE.RepeatWrapping; // 在纵向上使用边缘颜色填充
+texture.repeat.set(100, 100)
+console.log(texture)
+
+const planeMaterial = new THREE.MeshLambertMaterial({
+  map: texture,
+});
+const mesh = new THREE.Mesh( new THREE.PlaneGeometry( 5000, 5000 ), planeMaterial);
 mesh.rotation.x = - Math.PI / 2
 mesh.receiveShadow = true
+mesh.name = 'brick'
+console.log(mesh)
 scene.add( mesh )
-
-
-//mmd
-// const vpds = [];
-// let mmdmesh, helper
-// Ammo().then( function ( AmmoLib ) {
-
-// Ammo = AmmoLib;
-
-
-// } );
-// function onProgress( xhr ) {
-
-// if ( xhr.lengthComputable ) {
-
-//   const percentComplete = xhr.loaded / xhr.total * 100;
-//   console.log( Math.round( percentComplete, 2 ) + '% downloaded' );
-
-// }
-
-// }
-
-// const modelFile = 'src/assets/models/mmd/miku/miku_v2.pmd';
-// const vpdFiles = [
-// 'src/assets/models/mmd/vpds/01.vpd',
-// 'src/assets/models/mmd/vpds/02.vpd',
-// 'src/assets/models/mmd/vpds/03.vpd',
-// 'src/assets/models/mmd/vpds/04.vpd',
-// 'src/assets/models/mmd/vpds/05.vpd',
-// 'src/assets/models/mmd/vpds/06.vpd',
-// 'src/assets/models/mmd/vpds/07.vpd',
-// 'src/assets/models/mmd/vpds/08.vpd',
-// //'models/mmd/vpds/09.vpd',
-// //'models/mmd/vpds/10.vpd',
-// 'models/mmd/vpds/11.vpd'
-// ];
-
-// helper = new MMDAnimationHelper();
-
-// const mmdloader = new MMDLoader();
-
-// mmdloader.load( modelFile, function ( object ) {
-
-// mmdmesh = object;
-// mmdmesh.position.z = - 10;
-
-// skeleton = new THREE.SkeletonHelper( mmdmesh );
-// scene.add( mmdmesh );
-// scene.add( skeleton );
-// skeleton.bones.map((item, index) => {
-//   console.log(index, item.name)
-// })
-// let Euler = new THREE.Euler( PI / 3*2, 0, -PI / 4, 'XYZ' )
-// skeleton.bones[39].setRotationFromEuler( Euler )
-
-// let vpdIndex = 0;
-
-// function loadVpd() {
-
-//   const vpdFile = vpdFiles[ vpdIndex ];
-
-//   mmdloader.loadVPD( vpdFile, false, function ( vpd ) {
-
-//     vpds.push( vpd );
-
-//     vpdIndex ++;
-
-//     if ( vpdIndex < vpdFiles.length ) {
-
-//       loadVpd();
-
-//     } else {
-
-//       initGui();
-
-//     }
-
-//   }, onProgress, null );
-
-// }
-
-// loadVpd();
-
-// }, onProgress, null );
-
 
 const transformControls = new TransformControls(camera, renderer.domElement);
 transformControls.setSize(0.5)
@@ -259,6 +224,11 @@ function addRatio() {
   let threshold = guiFolder.addFolder( 'MotionCapture Threshold' )
   threshold.add( ratioSettings, 'threshold', 0.5, 0.95 )
   threshold.add( ratioSettings, 'cameraRotationFixRatio', 0.2, 1 )
+  let lightRatio = guiFolder.addFolder( 'LightSettings')
+  lightRatio.add(dirLight, 'intensity', 0, 2, 0.01).onChange(updateLight);
+  lightRatio.add(dirLight.target.position, 'x', -10, 10).onChange(updateLight);
+  lightRatio.add(dirLight.target.position, 'z', -10, 10).onChange(updateLight);
+  lightRatio.add(dirLight.target.position, 'y', 0, 10).onChange(updateLight);
 }
 
 //加载背景天空盒
@@ -268,7 +238,7 @@ function loadMap(index, url) {
     scene.background = new THREE.Color( 0xbfe3dd )
   } else {
 
-    const urls = genCubeUrls( 'src/assets/textures/' + url + '/', '.jpg' );
+    const urls = genCubeUrls( baseurl + 'src/assets/textures/' + url + '/', '.jpg' );
 
     cubeMapLoader.load( urls, function ( cubeTexture ) {
 
@@ -338,7 +308,6 @@ function exportScene() {
       } else {
 
         const output = JSON.stringify( result, null, 2 );
-        //console.log( output );
         saveString( output, 'scene.gltf' );
 
       }
@@ -352,12 +321,21 @@ function exportScene() {
   )
 }
 
+function hide() {
+  transformControls.visible = !transformControls.visible
+  skeleton.visible = !skeleton.visible
+  arrowHelperFront.visible = !arrowHelperFront.visible
+  arrowHelperRight.visible = !arrowHelperRight.visible
+  arrowHelperUp.visible = !arrowHelperUp.visible
+  lightHelper.visible = !lightHelper.visible
+}
+
 //截图
 function screenshot() {
   if(lastSelected){
     lastSelected.material.color.set(0xffffff)
   }
-  transformControls.visible = false
+  hide()
   renderer.render(scene, camera)
   const dataURL = renderer.domElement.toDataURL();
 
@@ -367,6 +345,7 @@ function screenshot() {
 
   document.body.appendChild(link);
   link.click();
+  hide()
   canvasdom.value.animate([{opacity: 1, easing: 'ease-in-out'}, {opacity: 0.3, easing: 'ease-in-out'}, {opacity: 1, easing: 'ease-in-out'}], 300)
 }
 
@@ -377,6 +356,13 @@ function updateThree() {
   camera.aspect = width / height
   camera.updateProjectionMatrix();
   renderer.setSize(width, height)
+  if( window.innerWidth < 700){
+    videoWidth.value = 250
+    videoHeight.value = 150
+  } else {
+    videoWidth.value = 500
+    videoHeight.value = 450
+  }
 }
 
 // const cube = new THREE.BoxGeometry(1, 1, 1)
@@ -399,6 +385,7 @@ for(var i = 0; i < 33; i++){
     spheremesh.position.z = Math.random() * 10
     spheremesh.receiveShadow = true
     spheremesh.castShadow = true
+    spheremesh.visible = debugSettings.keypointVisible
     keypoint.push(spheremesh)
     scene.add(spheremesh)
   }
@@ -406,6 +393,7 @@ for(var i = 0; i < 33; i++){
 function remove() {
   if(nowSelect ){
     transformControls.detach()
+    console.log(nowSelect)
     scene.remove(nowSelect)
     nowSelect.geometry.dispose()
     nowSelect.material.dispose()
@@ -425,9 +413,14 @@ function addmodel(i) {
     function ( gltf ) {
       addmodel = gltf.scene;
       gltf.scene.position.y = 8;
+      addmodel.scale.set(5, 5, 5)
+      addmodel.traverse( function ( object ) {
 
+      if ( object.isMesh )
+        object.castShadow = true;
+      //console.log( object.name, object.parent.name)
+      } );
       scene.add( addmodel );
-
 
 
       let intervel = setInterval( () => {
@@ -460,7 +453,6 @@ function addmodel(i) {
 
 //选中物体
 renderer.domElement.addEventListener('dblclick', () => {
-    var currentTime = new Date().getTime();
     // 更新选择器的状态
     raycaster.setFromCamera(mouse, camera);
     // 获取被选中的物体
@@ -469,33 +461,35 @@ renderer.domElement.addEventListener('dblclick', () => {
       lastColor = intersects[0].object.material.color
       // 遍历所有被选中的物体
       for(const item of intersects){
-        if(item.object != lastSelected && item.object.isMesh && !item.object.isTransformControlsPlane) {
+        if( item.object.isMesh && !item.object.isTransformControlsPlane ) {
           nowSelect = item.object
-          console.log('a', nowSelect)
-          item.object.material.emissive.setHex( 0x00ff00 );
-          transformControls.visible = true
-          if(item.object.isSkinnedMesh) {
-            transformControls.attach(nowSelect.SkeletonHelper)
-          } else {
-            transformControls.attach(nowSelect)
+          if( item.object.name != 'brick'){
+            transformControls.visible = true
+            item.object.material.emissive.setHex( 0x003300 );
           }
-          if(lastSelected) {
-            lastSelected.material.emissive.setHex( lastSelected.currentHex );
+
+          if( lastSelected ) {
+            lastSelected.material.emissive.setHex( 0x000000 );
           }
           break
         }
       }
       lastSelected = nowSelect
-    } else {
-      console.log(lastSelected)
-      lastSelected.material.color.set(0xffffff)
+      recursiveSelect()
+      transformControls.attach(nowSelect)
     }
-
   }
 );
 
+function recursiveSelect() {
+  while(!nowSelect.parent.isScene) {
+    nowSelect = nowSelect.parent
+  }
+}
+
 //返回首页
 function returnApp() {
+  //outputCamera.stop()
   instance.emit('returnApp')
 }
 
@@ -546,6 +540,15 @@ function RToA(value) {
   return value / Math.PI * 180
 }
 
+function vectersToRotateMatrix( up, right, front){
+  return new THREE.Matrix4().set(
+    right.x, front.x, up.x, 0,
+    right.y, front.y, up.y, 0,
+    right.z, front.z, up.z, 0,
+    0, 0, 0, 1
+  )
+}
+
 loader.load(
 // resource URL
 `${modelBaseUrl}Soldier.glb`,
@@ -561,8 +564,9 @@ function ( gltf ) {
   camera.lookAt(0, 14, 0)
   model.traverse( function ( object ) {
 
-    if ( object.isMesh ) object.castShadow = true;
-    //console.log( object.name, object.position.x, object.position.y, object.position.z )
+    if ( object.isMesh )
+      object.castShadow = true;
+    //console.log( object.name, object.parent.name)
   } );
 
 
@@ -576,9 +580,9 @@ function ( gltf ) {
   const headLength = 0.2 * length;
   const headWidth = 0.2 * headLength;
 
-  arrowHelperFront = new THREE.ArrowHelper(direction, origin, length, color, headLength, headWidth)
-  arrowHelperUp = new THREE.ArrowHelper(direction, origin, length, color, headLength, headWidth)
-  arrowHelperRight = new THREE.ArrowHelper(direction, origin, length, color, headLength, headWidth)
+  arrowHelperFront = new THREE.ArrowHelper(new THREE.Vector3( 0, -0.8, 0.5 ), origin, length, new THREE.Color(0xff0000), headLength, headWidth)
+  arrowHelperUp = new THREE.ArrowHelper(new THREE.Vector3( 0, 0.5, 0.8 ), origin, length, new THREE.Color(0x00ff00), headLength, headWidth)
+  arrowHelperRight = new THREE.ArrowHelper(new THREE.Vector3( 1, 0, 0 ), origin, length, new THREE.Color(0x0000ff), headLength, headWidth)
 
   scene.add(arrowHelperFront);
   scene.add(arrowHelperUp)
@@ -586,8 +590,17 @@ function ( gltf ) {
 
 
   let PI = Math.PI
-  let Euler = new THREE.Euler( Math.PI / 2, 0  , 0, 'XYZ' )
+  let Euler = new THREE.Euler( PI / 2, 0  , 0, 'XYZ' )
   skeleton.bones[0].setRotationFromEuler( Euler )
+
+  skeleton.bones[24].rotation.set(PI / 3, 0, 0)
+  console.log(skeleton.bones[24].rotation)
+
+  //右，上, 前
+  let matrix = new THREE.Matrix4().makeRotationFromEuler(  skeleton.bones[24].rotation
+  )
+  matrix.extractBasis(rightVec, frontVec, upVec)
+  console.log(matrix)
 
   skeleton.visible = true
   scene.add( skeleton );
@@ -611,6 +624,7 @@ function ( error ) {
 function calculateTargetVector( target, parent ) {
   return new THREE.Vector3( target.x - parent.x, target.y - parent.y, target.z - parent.z).normalize()
 }
+
 //更新肢体骨骼节点
 function updateLimbBones( target, parent, skeletonIndex, right, ratio ) {
   let xTemp = target.clone().setY(0)
@@ -685,13 +699,28 @@ function updateSkeleton(array) {
 
   //rightForeArm
   let rightForeArm = calculateTargetVector(array[14], array[12])
+  //rightArm
+  let rightArm = calculateTargetVector(array[16], array[14])
+
+  let rightForeArmRight = new THREE.Vector3().crossVectors(rightForeArm, rightArm)
+  let rightForeArmUp = new THREE.Vector3().crossVectors( rightForeArmRight, rightForeArm )
+
+  let mat = new THREE.Matrix4().set(
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  )
+  let El = new THREE.Euler().setFromRotationMatrix(mat)
+
+  //rightForeArm
   if (array[14].visibility > ratioSettings.threshold || array[12].visibility > ratioSettings.threshold){
     updateLimbBones( rightForeArm, right.clone().negate(), 24, true, ratioSettings.foreArm )
+    //skeleton.bones[24].rotation.copy(El)
   }
 
 
   //rightArm
-  let rightArm = calculateTargetVector(array[16], array[14])
   if (array[16].visibility > ratioSettings.threshold || array[14].visibility > ratioSettings.threshold){
     updateLimbBones( rightArm, rightForeArm, 25, true, ratioSettings.arm )
   }
@@ -737,11 +766,19 @@ function updateSkeleton(array) {
     updateLeg( leftLeg, leftUpLeg.setX(0), leftUpLeg.setZ(0).setZ(0), 42, true, ratioSettings.leg )
   }
 
-    arrowHelperUp.setDirection(rightForeArm)
-  //  arrowHelperFront.setDirection(midright)
+
+    arrowHelperFront.setDirection(rightForeArm)
+    arrowHelperUp.setDirection(rightForeArmUp)
+    arrowHelperRight.setDirection(rightForeArmRight)
+
 }
 
 onMounted( async () => {
+  if( window.innerWidth < 1000){
+    isMobile.value = true
+    videoWidth.value = 300
+    videoHeight.value = 200
+  }
   gui.value.appendChild(guiFolder.domElement)
   instance = getCurrentInstance()
   loadMap(1, 'pisa')
@@ -821,7 +858,7 @@ onMounted( async () => {
   }
 
   const pose = new Pose({locateFile: (file) => {
-    return `@mediapipe/pose/${file}`;
+    return baseurl + `@mediapipe/pose/${file}`;
   }});
   pose.setOptions({
     modelComplexity: 1,
@@ -849,6 +886,7 @@ onMounted( async () => {
         const videoElement = document.getElementsByClassName('input_video')[0];
         console.log(file)
         videoPlayer.value.src = reader.result
+        inputVisible.value = false
         videoElement.addEventListener("timeupdate", async () => {
           await pose.send({image: videoElement});
         })
@@ -862,7 +900,6 @@ onMounted( async () => {
   if( props.type == 'image' ) {
     const fileInput = inputImage.value
     await nextTick()
-
     fileInput.addEventListener( "change", async () => {
       const file = fileInput.files[0]
       const reader = new FileReader()
@@ -872,6 +909,7 @@ onMounted( async () => {
         src.value = reader.result
         image = new Image()
         image.src = src.value
+        inputVisible.value = false
         console.log(src.value)
         await pose.send({image: image})
       })
@@ -882,14 +920,15 @@ onMounted( async () => {
 
   }
   if( props.type == 'camera' ){
-    const camera = new Camera(videoElement, {
+    inputVisible.value = false
+    outputCamera = new Camera(videoElement, {
       onFrame: async () => {
         await pose.send({image: videoElement});
       },
-      width: 500,
-      height: 400
+      width: videoWidth.value,
+      height: videoHeight.value
     });
-    camera.start();
+    outputCamera.start();
     videoElement.addEventListener("timeupdate", async () => {
       await pose.send({image: videoElement});
     })
@@ -923,47 +962,47 @@ watch(visible, async () => {
 <template>
 <var-paper class="mcContainer" >
   <var-paper class="sidebar" :elevation="20">
-    <var-cell :border="false" ripple class="menuItem" :elevation="18" @click="returnApp">
+    <div :border="false" ripple class="menuItem" :elevation="18" @click="returnApp">
         <div class="sidebarText">返回</div>
         <var-icon name="chevron-left" :size="sidebarIconSize" />
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="setmode(0)" :style="{'background-color': interactType == 0 ? '#636b80d3' : 'transparent'}">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="setmode(0)" :style="{'background-color': interactType == 0 ? '#636b80d3' : 'transparent'}">
         <div class="sidebarText">移动</div>
         <var-icon name="src/assets/icons/移动.svg" :size="sidebarIconSize" color="#2979ff"/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="setmode(1)" :style="{'background-color': interactType == 1 ? '#636b80d3' : 'transparent'}">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="setmode(1)" :style="{'background-color': interactType == 1 ? '#636b80d3' : 'transparent'}">
         <div class="sidebarText">旋转</div>
         <var-icon name="src/assets/icons/旋转.svg" :size="sidebarIconSize" color="#2979ff"/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="setmode(2)" :style="{'background-color': interactType == 2 ? '#636b80d3' : 'transparent'}">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="setmode(2)" :style="{'background-color': interactType == 2 ? '#636b80d3' : 'transparent'}">
         <div class="sidebarText">缩放</div>
         <var-icon name="src/assets/icons/缩放.svg" :size="sidebarIconSize"/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="visible = !visible; pointer = 0">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="visible = !visible; pointer = 0">
         <div class="sidebarText">编辑</div>
         <var-icon name="menu" :size="sidebarIconSize" v-if="!visible" :transition="300"/>
         <var-icon name="menu-open" :size="sidebarIconSize" v-else/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="remove">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="remove">
         <div class="sidebarText">删除</div>
         <var-icon name="trash-can-outline" :size="sidebarIconSize"/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="exportScene">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="exportScene">
         <div class="sidebarText">导出</div>
         <var-icon name="upload" :size="sidebarIconSize"/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="fullscreen = !fullscreen">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="fullscreen = !fullscreen">
         <div class="sidebarText">全屏</div>
         <var-switch v-model="fullscreen" :size="sidebarIconSize/2" @click.stop/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="settings.mcEnabled = !settings.mcEnabled">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="settings.mcEnabled = !settings.mcEnabled" v-if="props.type == 'camera'">
       <div class="sidebarText">动捕</div>
       <var-switch v-model="settings.mcEnabled" :size="sidebarIconSize/2" @click.stop/>
-    </var-cell>
-    <var-cell :border="false" ripple class="menuItem" @click="screenshot">
+    </div>
+    <div :border="false" ripple class="menuItem" @click="screenshot">
       <div class="sidebarText">截屏</div>
       <var-icon name="camera" size="30"/>
-    </var-cell>
+    </div>
   </var-paper>
   <var-paper class="slidebar" v-if="visible" :elevation="12">
       <var-cell :border="false" class="top" :elevation="24" >
@@ -971,13 +1010,13 @@ watch(visible, async () => {
           <var-swipe-item class="swipe-item" >
               <var-cell >
                 <var-icon name="src/assets/icons/立方体.svg" size="20"/>
-                <div style="width: 200px">网格</div>
+                <div >网格</div>
               </var-cell>
           </var-swipe-item>
           <var-swipe-item class="swipe-item">
               <var-cell >
                 <var-icon name="image" size="20"/>
-                <div style="width: 200px">背景</div>
+                <div >背景</div>
               </var-cell>
           </var-swipe-item>
         </var-swipe>
@@ -996,23 +1035,15 @@ watch(visible, async () => {
       <div ref="canvasdom" ></div>
     </var-paper>
     <div :class="[!fullscreen ? 'half' : 'noDisplay']">
-      <var-paper :elevation="12" :radius="10" class="skeleton input" v-if="props.type == 'image'">
-        <var-image :src="src" width="500" height="400" v-if="showInput"></var-image>
-        <image id="preview" style="display: none;"></image>
-        <input type="file" ref="inputImage">
+      <var-paper :elevation="12" :radius="10" class="skeleton"  >
+        <var-loading v-show="loading && !inputVisible" type="wave" size="large" style="top:45%"/>
+        <input type="file" ref="inputImage" v-if="props.type == 'image' && inputVisible">
+        <video class="input_video" :width="videoWidth" :height="videoHeight" ref="videoPlayer" v-if="props.type == 'video'" style="display: none;" autoplay controls muted></video>
+        <input type="file" ref="inputVideo" v-if="props.type == 'video' && inputVisible" >
+        <video class="input_video" :width="videoWidth" :height="videoHeight" style="display: none;" v-if="props.type == 'camera'" ></video>
+        <canvas class="output_canvas" :width="videoWidth" :height="videoHeight" :style="{'display': loading && !inputVisible ? 'none' : 'flex','z-index': 1}"  ></canvas>
       </var-paper>
-      <var-paper :elevation="12" :radius="10" class="skeleton" v-if="props.type == 'video'">
-        <video class="input_video" width="500" height="400" ref="videoPlayer" v-if="showInput" controls muted src="./1.只因你太美（鸡你太美）原版(Av51818204,P1).mp4"></video>
-        <input type="file" ref="inputVideo">
-      </var-paper>
-      <var-paper :elevation="12" :radius="10" class="skeleton" v-if="props.type == 'camera'">
-        <video class="input_video" width="500" height="450"></video>
-      </var-paper>
-      <var-paper :elevation="12" :radius="10" class="skeleton" style="align-items: center;" >
-        <canvas class="output_canvas" width="500" height="450" :style="{'display': loading ? 'none' : 'flex'}" ></canvas>
-        <var-loading v-show="loading" type="wave" size="large"/>
-      </var-paper>
-      <div class="skeleton gui" ref="gui"></div>
+      <div class="gui" ref="gui"></div>
     </div>
 
   </var-paper>
@@ -1057,21 +1088,14 @@ $sidebarFontSize: 20px;
   border-radius: 10px;
   display: none;
 }
-input{
-  @media (max-width: 1000px) {
-    width: 50px;
-  }
-}
-:deep(.root) {
-  width: 100%;
-  border-radius: 15px;
-  padding: 5%;
-}
 :deep(.var-swipe){
   overflow: hidden;
   user-select: none;
   width: 100%;
   height: 100%;
+}
+:deep(.var-swipe__indicators){
+  bottom: 0;
 }
 :deep(.var-cell){
   width: 100%;
@@ -1084,20 +1108,22 @@ input{
   height: 100%;
 }
 :deep(.root){
-  padding: 1%;
+  padding: 2%;
+  border-radius: 15px;
+  width: 100%;
 }
 :deep(.slider ){
-  @media (max-width: 1000px) {
+  @media (max-width: 700px) {
     width: 150px;
   }
 }
 :deep(.controller){
-  @media (max-width: 1000px) {
+  @media (max-width: 700px) {
     height: 30px;
   }
 }
 :deep(.title){
-  @media (max-width: 1000px) {
+  @media (max-width: 700px) {
     height: 30px;
   }
 }
@@ -1106,12 +1132,12 @@ input{
   width: 100vw;
   height: 100vh;
   align-items: center;
-  @media (max-width: 1000px) {
+  @media (max-width: 700px) {
     //flex-direction: column;
     flex-direction: column-reverse;
   }
   .sidebar{
-      width: 5%;
+      width:8%;
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -1120,10 +1146,10 @@ input{
       //background-color: $blueLite;
       flex-shrink: 0;
       padding-bottom: 6%;
-      @media (max-width: 1000px) {
+      @media (max-width: 700px) {
         flex-direction: row;
         width: 100%;
-        height: 8%;
+        height: 6%;
         justify-content: flex-start;
         align-items: center;
         overflow: auto;
@@ -1135,16 +1161,16 @@ input{
         justify-content: space-between;
         align-items: center;
         //margin: 2%;
-        //padding: 10%;
+        padding: 1%;
         font-size: $sidebarFontSize;
         cursor: pointer;
-        @media (max-width: 1000px) {
+        @media (max-width: 700px) {
           width: 100px;
           height: 100%;
-          flex-direction: column;
+          //flex-direction: column;
         }
         .sidebarText{
-          width: 100px;
+          width: 50px;
         }
       }
       .withSwitch{
@@ -1162,10 +1188,11 @@ input{
       justify-content: center;
       align-items: flex-start;
       transition: transform 0.5s ease-out;
-      @media (max-width: 1000px) {
+      @media (max-width: 700px) {
         width: 100%;
-        height: 15%;
+        height: 10%;
         flex-direction: row;
+        @include center()
       }
       //margin-left: 1%;
       //border: 5px solid $blueFull;
@@ -1174,7 +1201,7 @@ input{
         width: 100%;
         height: 5%;
         padding: 0;
-        padding-left: 2%;
+        //padding-left: 2%;
         font-size: 20px;
         //border-bottom: 5px solid $blueFull;
         :deep(.var-cell__content){
@@ -1183,33 +1210,39 @@ input{
           width: 100%;
           height: 100%;
         }
-        @media (max-width: 1000px) {
-          width: 20%;
+        @media (max-width: 700px) {
+          width: 15%;
           height: 100%;
+          padding-left: 0;
         }
         .swipe-item {
           width: 100%;
           height: 100%;
           object-fit: cover;
           pointer-events: none;
-          padding-left: 13%;
+          //padding-left: 13%;
           @include center();
           font-size: 20px;
-          @media (max-width: 1000px) {
+          @media (max-width: 700px) {
             width: 100%;
             height: 100%;
-            flex-direction: column;
+            //flex-direction: column;
+          }
+          :deep(.var-cell){
+            padding: 0;
           }
         }
       }
-      .down{ display: flex;
+      .down{
+        display: flex;
         align-items: center;
         flex-direction: column;
         overflow: auto;
         width: 100%;
         flex: 1;
-        @media (max-width: 1000px) {
+        @media (max-width: 700px) {
           height: 100%;
+          flex: 1;
           flex-direction: row;
           justify-content: center;
           align-items: center;
@@ -1222,9 +1255,9 @@ input{
           //flex-shrink: 0;
           //border: 2px solid $blueLite;
           margin-top: 15px;
-          @media (max-width: 1000px) {
-            height: 100%;
-            width: 200px;
+          @media (max-width: 700px) {
+            //height: 100%;
+            aspect-ratio: 1;
             margin-top: 0;
           }
         }
@@ -1240,7 +1273,7 @@ input{
       height: 95%;
       width: 42vw;
       margin: 1vw;
-      @media (max-width: 1000px) {
+      @media (max-width: 700px) {
         height: 60%;
         width: 95%;
       }
@@ -1253,36 +1286,44 @@ input{
       height: 95%;
       margin: 1%;
       flex-shrink: 0;
-      @media (max-width: 1000px) {
+      @media (max-width: 700px) {
         height: 20%;
         width: 95%;
+        margin-top: 5%;
         flex-direction: row;
       }
       .skeleton{
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: space-around;
+        justify-content: flex-start;
         flex-shrink: 0;
         width: 500px;
-        height: 400px;
+        height: 500px;
         overflow: auto;
         border-radius: 10px;
-        @media (max-width: 1000px) {
+        @media (max-width: 700px) {
           display: flex;
-          height: 90%;
+          height: 100%;
           width: 48%;
         }
       }
-      .input{
-        @media (max-width: 1000px) {
-          width: 15%;
-        }
-      }
+
       .gui{
-        justify-content: flex-start;
+        width: 500px;
+        height: 450px;
+        overflow: auto;
+        border-radius: 10px;
+        //justify-content: flex-start;
         overflow: auto;
         flex: 1;
+        @media (max-width: 700px) {
+          display: flex;
+          flex-direction: column;
+          justify-content: flex-start;
+          height: 100%;
+          width: 48%;
+        }
       }
     }
 
