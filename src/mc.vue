@@ -1127,6 +1127,9 @@ $sidebarFontSize: 20px;
     height: 30px;
   }
 }
+:deep(.var-swipe__indicators) {
+  padding-bottom: 0;
+}
 .mcContainer{
   display: flex;
   width: 100vw;
@@ -1199,7 +1202,7 @@ $sidebarFontSize: 20px;
       .top{
         @include center();
         width: 100%;
-        height: 5%;
+        height: 6%;
         padding: 0;
         //padding-left: 2%;
         font-size: 20px;
@@ -1212,7 +1215,7 @@ $sidebarFontSize: 20px;
         }
         @media (max-width: 700px) {
           width: 15%;
-          height: 100%;
+          height: 80%;
           padding-left: 0;
         }
         .swipe-item {

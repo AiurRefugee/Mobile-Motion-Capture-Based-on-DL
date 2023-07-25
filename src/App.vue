@@ -409,25 +409,26 @@ div{
     @media (max-width: 1000px) {
       flex-direction: column;
     }
-    .title{
-      min-width: 50%;
+    .title{ 
       min-height: 8vh;
       font-size: 50px;
       padding-right: 1%;
       font-style: italic;
+      letter-spacing: 3px;
       @include center();
-      padding-left: 1%;
+      padding-left: 2%;
       justify-content: flex-start;
       font-weight: 900;
       font-family: math;
       @media (max-width: 1000px) {
-        font-size: 20px;
+        font-size: 30px;
         width: 100vw;
       }
     }
     .topbarIcons{
-      min-width: 50%;
+       min-width: 45%;
       @include center();
+      max-height: 100px; 
       @media (max-width: 1000px) {
         font-size: 20px;
         width: 100%;
@@ -450,7 +451,7 @@ div{
       height: 70%;
       display: flex;
       justify-content: flex-start;
-      padding-top: 2%;
+      // padding-top: 2%;
       @media (max-width: 1000px) {
         padding-top: 0%;
       }
